@@ -6,6 +6,16 @@ All notable project, documentation, and implementation changes should be recorde
 
 ## [Unreleased]
 
+### Fixed and verified — 2026-10-31 (billing cadence and live workflow)
+
+- Added migration 008 and stored each subscription's billing anniversary day. Monthly billing now returns to the original day after a short month, yearly February 29 billing returns on leap years, and resume sets a new anchor from the shifted due date. The migration applied successfully to the local MySQL database.
+- Added repeated-period monthly and yearly billing acceptance assertions. The live auth, catalogue, subscriptions, and billing API suites passed against the local database and compiled API.
+- Added a Playwright Edge browser check for Admin invoice and finance views, Customer invoice deep links and payments, Staff controls, and printable invoice PDF output. The check passed with the local Vite and API servers. Vite now proxies to IPv4 loopback, and sign-in preserves the requested destination after a session update.
+- Added a local SMTP capture check for actual Nodemailer invoice delivery, recipient, invoice amount, and portal link; it passed without sending mail outside the machine. External SMTP delivery remains unverified. A PDF attachment is not part of the current invoice email.
+- Added a temporary 1,000-record finance benchmark. Summary, invoice list, and payment list p95 values were 9.1 ms, 7.8 ms, and 12.4 ms respectively across 20 local requests each; finance deltas and an overdue-query EXPLAIN were checked, and the fixture was removed. These timings describe this local Docker setup only.
+- Added `seed:demo` and ran it against the local database, creating two fictional customers, a Staff account, product variant, monthly and weekly plans, a quotation template, discount, partial and full payments, and a due subscription. The seed run verifies repeat billing creates no duplicate invoice and each customer is denied the other's invoice. Generated credentials and record IDs are saved to Git-ignored `demo-credentials.txt`. An npm override now keeps transitive `mysql2` on the declared patched version; server `npm audit --audit-level=moderate` reported zero vulnerabilities after install.
+- Remaining live checks: concurrent billing, optional scheduler execution, external SMTP provider delivery, and deployed environment behaviour.
+
 ### Added — 2026-10-31 (invoice delivery and print)
 
 - Added a role-checked printable invoice page with a browser Print / Save as PDF action. Unauthenticated users return to the requested page after signing in.

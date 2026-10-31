@@ -40,6 +40,7 @@ interface SubscriptionLockedRow
   start_date: string | null;
   expiry_date: string | null;
   next_billing_at: string | null;
+  billing_anchor_day: number | null;
   payment_terms_days: number;
   status: "DRAFT" | "QUOTATION" | "CONFIRMED" | "ACTIVE" | "PAUSED" | "CLOSED";
   billing_interval_unit: IntervalUnit;
@@ -313,6 +314,7 @@ async function billOne(
         nextIso,
         subscription.billing_interval_unit,
         subscription.billing_interval_count,
+        subscription.billing_anchor_day ?? Number(nextIso.slice(8, 10)),
       );
       // A contract end inside the interval truncates the final period.
       const periodEnd =
@@ -455,7 +457,7 @@ async function billOne(
       // succeeded, and always in the same transaction, per §7.
       await connection.execute(
         "UPDATE subscriptions SET next_billing_at = ? WHERE id = ?",
-        [mysqlUtc(new Date(`${newNextIso}T00:00:00Z`)), subscriptionId],
+        [`${newNextIso}${subscription.next_billing_at.slice(10)}`, subscriptionId],
       );
 
       await connection.execute(

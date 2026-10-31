@@ -36,6 +36,7 @@ coverage/
 # Environment files and secrets
 .env
 .env.*
+/demo-credentials.txt
 !.env.example
 !.env.sample
 !.env.template

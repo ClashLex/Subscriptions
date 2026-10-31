@@ -354,6 +354,57 @@ await step("payment accepts a date-only paidAt without failing", async () => {
   assert.equal(paid.json?.data?.payments?.[0]?.paidAt, `${today} 00:00:00`);
 });
 
+await step("monthly and yearly invoices retain their anniversary day after clamping", async () => {
+  const startYear = Number(today.slice(0, 4)) - 1;
+  const febLast = new Date(Date.UTC(startYear, 2, 0)).getUTCDate();
+  const monthlyStart = `${startYear}-01-31`;
+  const annualStart = "2016-02-29";
+  const cases = [
+    { unit: "MONTH", start: monthlyStart },
+    { unit: "YEAR", start: annualStart },
+  ];
+  const ids = {};
+  for (const fixture of cases) {
+    const plan = await req("POST", "/plans", { body: {
+      name: `Billing cadence ${fixture.unit} ${run}`,
+      price: "1.00", billingIntervalUnit: fixture.unit, billingIntervalCount: 1,
+      minimumQuantity: 1, availableFrom: "2010-01-01", availableUntil: "2099-12-31",
+    } });
+    assert.equal(plan.status, 201, show(plan));
+    const created = await req("POST", "/subscriptions", { body: {
+      customerId, planId: plan.json.data.id, startDate: fixture.start,
+      lines: [{ productId, quantity: 1 }],
+    } });
+    assert.equal(created.status, 201, show(created));
+    ids[fixture.unit] = created.json.data.id;
+    for (const path of ["quotation", "confirm", "activate"]) {
+      const transitioned = await req("POST", `/subscriptions/${created.json.data.id}/${path}`, { body: {} });
+      assert.equal(transitioned.status, 200, show(transitioned));
+    }
+  }
+  const monthlyEnds = [
+    `${startYear}-02-${febLast}`,
+    `${startYear}-03-31`,
+    `${startYear}-04-30`,
+    `${startYear}-05-31`,
+  ];
+  const annualEnds = ["2017-02-28", "2018-02-28", "2019-02-28", "2020-02-29"];
+  let monthStart = monthlyStart;
+  let yearStart = annualStart;
+  for (let index = 0; index < 4; index += 1) {
+    const billed = await req("POST", "/billing/run", { body: {} });
+    assert.equal(billed.status, 200, show(billed));
+    const month = billed.json?.data?.invoices?.find((invoice) => invoice.subscriptionId === ids.MONTH);
+    const year = billed.json?.data?.invoices?.find((invoice) => invoice.subscriptionId === ids.YEAR);
+    assert.equal(month?.periodStart, monthStart, show(billed));
+    assert.equal(month?.periodEnd, monthlyEnds[index], show(billed));
+    assert.equal(year?.periodStart, yearStart, show(billed));
+    assert.equal(year?.periodEnd, annualEnds[index], show(billed));
+    monthStart = monthlyEnds[index];
+    yearStart = annualEnds[index];
+  }
+});
+
 if (failures > 0) {
   console.error(`\n${failures} billing acceptance step(s) failed.`);
   process.exitCode = 1;

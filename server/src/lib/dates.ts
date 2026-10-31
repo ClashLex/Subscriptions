@@ -17,12 +17,16 @@ function daysInUtcMonth(date: Date): number {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
 }
 
-/** Adds one billing interval, clamping month-end overflow (Jan 31 + 1M → Feb 28). */
+/** Adds one billing interval, clamping short months and retaining an optional anniversary day. */
 export function addIntervalIso(
   iso: string,
   unit: "DAY" | "WEEK" | "MONTH" | "YEAR",
   count: number,
+  anchorDay = Number(iso.slice(8, 10)),
 ): string {
+  if (!Number.isInteger(anchorDay) || anchorDay < 1 || anchorDay > 31) {
+    throw new RangeError("Billing anchor day must be from 1 to 31.");
+  }
   const date = new Date(`${iso}T00:00:00Z`);
   switch (unit) {
     case "DAY":
@@ -32,17 +36,15 @@ export function addIntervalIso(
       date.setUTCDate(date.getUTCDate() + 7 * count);
       break;
     case "MONTH": {
-      const day = date.getUTCDate();
       date.setUTCDate(1);
       date.setUTCMonth(date.getUTCMonth() + count);
-      date.setUTCDate(Math.min(day, daysInUtcMonth(date)));
+      date.setUTCDate(Math.min(anchorDay, daysInUtcMonth(date)));
       break;
     }
     case "YEAR": {
-      const day = date.getUTCDate();
       date.setUTCDate(1);
       date.setUTCFullYear(date.getUTCFullYear() + count);
-      date.setUTCDate(Math.min(day, daysInUtcMonth(date)));
+      date.setUTCDate(Math.min(anchorDay, daysInUtcMonth(date)));
       break;
     }
   }

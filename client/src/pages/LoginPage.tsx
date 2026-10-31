@@ -1,15 +1,11 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { asApiError, type ApiError } from "../lib/api.js";
+import { loginDestination } from "../lib/navigation.js";
 import { useSession } from "../state/session.js";
 import { Button, ErrorBanner, Field, TextInput } from "../ui/components.js";
-import type { Role } from "../lib/types.js";
 
 /** Admin/Staff land in the back office; customers get the portal. */
-export function homeFor(role: Role | undefined): string {
-  return role === "CUSTOMER" ? "/portal" : "/admin";
-}
-
 export function LoginPage() {
   const session = useSession();
   const navigate = useNavigate();
@@ -27,10 +23,7 @@ export function LoginPage() {
     setError(null);
     try {
       const user = await session.login(email.trim(), password);
-      const next = new URLSearchParams(location.search).get("next");
-      const destination = next !== null && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\")
-        ? next : homeFor(user.role);
-      navigate(destination, { replace: true });
+      navigate(loginDestination(user.role, location.search), { replace: true });
     } catch (caught) {
       setError(asApiError(caught));
     } finally {

@@ -27,8 +27,12 @@
     "@types/express-mysql-session": "^3.0.8",
     "@types/express-session": "^1.19.0",
     "@types/node": "^26.6.6",
+    "smtp-server": "^3.21.3",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "mysql2": "$mysql2"
   },
   "allowScripts": {
     "argon2@0.45.1": true,
@@ -40,6 +44,7 @@
     "start": "node dist/src/server.js",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
+    "seed:demo": "node --env-file=../.env scripts/seed-demo.mjs",
     "typecheck": "tsc --noEmit",
     "test:auth": "node --env-file=../.env scripts/test-auth.mjs",
     "test:catalogue": "node --env-file=../.env scripts/test-catalogue.mjs",
@@ -47,6 +52,8 @@
     "test:billing": "node --env-file=../.env scripts/test-billing.mjs",
     "test:finance:unit": "npm run build && node scripts/test-finance-summary.mjs",
     "test:billing:unit": "npm run build && node scripts/test-billing-dates.mjs",
+    "test:email:unit": "npm run build && node scripts/test-invoice-email.mjs",
+    "test:performance": "node --env-file=../.env scripts/test-performance.mjs",
     "debugfetch": "node --env-file=../.env scripts/debug-fetch.mjs"
   }
 }

@@ -13,7 +13,7 @@ The application is under active development. The table separates features availa
 | Browser | Sign in, customer registration and password reset; Admin and Staff catalogue, tax, plan, quotation template, subscription, invoice, payment, and discount screens; finance overview; customer subscription, invoice, and payment views; printable invoices. |
 | API | Authentication and roles; customer directory; catalogue and plans; quotation and subscription lifecycle; discount rules; recurring invoice generation; invoice reads, confirmation, cancellation, and email delivery; payment recording and reads; finance summary. |
 | Billing trigger | Admin-only **Run billing** control on the invoice screen, `POST /api/v1/billing/run`, or an optional in-process scheduler. The scheduler is disabled by default. |
-| Still to build | Automated PDF attachments, broader recurrence/concurrency and live browser checks, performance and demo verification. |
+| Remaining work | External SMTP delivery and deployment checks, billing concurrency coverage, and any PDF email attachment required by the final submission. |
 
 The main workflow is: configure a product and plan, create a customer subscription, submit and confirm its quotation, activate it, run billing when due, confirm the invoice, and record payments. Admins run billing from **Invoices & billing**. Admins and Staff can review invoices, confirm or cancel eligible invoices, record payments, search payment history, print or save an invoice as a PDF through the browser, and email a confirmed or paid invoice link when SMTP is configured. The **Overview** shows dated invoiced and received amounts plus current outstanding and overdue balances. Admins create, edit, activate, and deactivate discount rules; Staff can read active rules.
 
@@ -64,7 +64,7 @@ npm.cmd run migrate
 npm.cmd run seed
 ```
 
-`migrate` applies pending files in `server/migrations/` and records them in `schema_migrations`. `seed` creates or updates the Admin account from `.env`; it does not create a full demo dataset.
+`migrate` applies pending files in `server/migrations/` and records them in `schema_migrations`. Migration 008 stores each subscription's billing anniversary day so a monthly contract beginning on January 31 bills on February 28 (or 29) and then returns to March 31; yearly February 29 contracts return to that date in leap years. `seed` creates or updates the Admin account from `.env`; it does not create a full demo dataset.
 
 ### 3. Start the API and browser
 
@@ -98,6 +98,8 @@ Subscriptions follow **Draft → Quotation → Confirmed → Active**. Active su
 
 The optional scheduler uses `BILLING_RUN_INTERVAL_MINUTES` in `.env`. A positive value starts periodic runs after the configured interval. Leave it blank or set it to `0` to use only the Admin API trigger. The scheduler has not yet been verified in a live deployment.
 
+Monthly and yearly billing keeps the contract's anniversary day when a shorter month forces a temporary earlier date. Pausing and resuming a subscription shifts its next due date and sets a new anniversary day from that shifted date.
+
 ### Billing in the browser
 
 1. Sign in as Admin. In **Plans**, set the billing interval and a reference price. In **Products & variants**, set sale prices. Create a quotation template or add priced product lines when creating a subscription.
@@ -112,7 +114,11 @@ Billing is repeat-safe for an already invoiced subscription period. The browser'
 
 Password reset uses SMTP when configured. In local development without SMTP, the reset link is logged by the server and returned to the browser as a development link.
 
-Invoice email requires `SMTP_HOST` and a suitable `MAIL_FROM` in `.env`. Without SMTP, the **Email customer** action returns an error and does not log invoice data. It sends a secure portal link, not a PDF attachment. Customers must sign in to open the link; the API checks invoice ownership.
+Invoice email requires `SMTP_HOST` and a suitable `MAIL_FROM` in `.env`. Without SMTP, the **Email customer** action returns an error and does not log invoice data. It sends a portal link, without a PDF attachment. Customers must sign in to open the link; the API checks invoice ownership. The SMTP capture test verifies message content locally; delivery through a real external provider still needs checking with the deployment credentials.
+
+### Prepare local demo records
+
+With the API and database running, run `npm.cmd run seed:demo` from `server/`. This creates two fictional customers, a Staff account, a product and variant, monthly and weekly plans, a quotation template, tax and discount, partially and fully paid invoices, and an active subscription ready for the Admin **Run billing** action. The two customers let you demonstrate that each sees only their own records. The script writes generated sign-in details and record IDs to the Git-ignored `demo-credentials.txt` at the repository root. Use a local demo database; each run creates another dataset.
 
 ## Checks
 
@@ -125,7 +131,7 @@ npm.cmd run test:subscriptions
 npm.cmd run test:billing
 ```
 
-The API acceptance scripts create test records in the configured database, so use a local test or demo database. `test:finance:unit` and `test:billing:unit` run without a database after building the server. The billing unit check covers interval date math; the live billing suite covers its daily invoice path. Weekly, monthly, yearly, concurrent-run, and large-dataset invoice cases still need broader verification.
+The API acceptance scripts create test records in the configured database, so use a local test or demo database. `test:finance:unit`, `test:billing:unit`, and `test:email:unit` run without a database after building the server. The email check captures one message in a local SMTP server. The billing unit check covers interval date math; the live billing suite covers daily billing and repeated monthly/yearly periods. Concurrent billing and scheduler execution still need live checks.
 
 The checks below do not require the running API:
 
@@ -135,12 +141,15 @@ npm.cmd run typecheck
 npm.cmd run build
 npm.cmd run test:finance:unit
 npm.cmd run test:billing:unit
+npm.cmd run test:email:unit
 
 # From client/
 npm.cmd run test:api
 npm.cmd run lint
 npm.cmd run build
 ```
+
+For the browser workflow check, keep the API and Vite running and install Microsoft Edge on the test machine. From `client/`, run `npm.cmd run test:e2e`. This Playwright check exercises Admin, Customer, and Staff views, including a rendered invoice PDF. It creates test records in the local database. Run `npm.cmd run test:performance` from `server/` to measure finance summary and list responses with 1,000 temporary records; the script deletes its fixture after the run. These are local checks, not production load results.
 
 The [changelog](docs/CHANGELOG.md) records verification evidence and remaining gaps. Live API acceptance scripts need a running MySQL server and API.
 
@@ -153,7 +162,7 @@ The [changelog](docs/CHANGELOG.md) records verification evidence and remaining g
 | `server/src/modules/` | API routes, schemas, and business services. |
 | `server/src/jobs/` | Optional billing scheduler. |
 | `server/migrations/` | Ordered MySQL schema changes. |
-| `server/scripts/` | Migration, seed, and API acceptance scripts. |
+| `server/scripts/` | Migration, seed, acceptance, SMTP capture, and performance scripts. |
 | `docs/CHANGELOG.md` | Tracked record of implementation changes, checks, and open gaps. |
 
 ## Documentation in Git

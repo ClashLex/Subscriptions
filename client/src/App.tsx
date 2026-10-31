@@ -2,7 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-route
 import { SessionProvider, useSession } from "./state/session.js";
 import { PageLoader } from "./ui/components.js";
 import { AdminLayout } from "./pages/AdminLayout.js";
-import { LoginPage, homeFor } from "./pages/LoginPage.js";
+import { LoginPage } from "./pages/LoginPage.js";
+import { homeFor, loginDestination } from "./lib/navigation.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage.js";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage.js";
@@ -37,11 +38,12 @@ function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }
 
 function PublicOnly({ children }: { children: ReactNode }) {
   const session = useSession();
+  const location = useLocation();
   if (session.status === "loading") {
     return <PageLoader />;
   }
   if (session.user !== null) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={loginDestination(session.user.role, location.search)} replace />;
   }
   return <>{children}</>;
 }

@@ -880,8 +880,8 @@ export async function activateSubscription(
       );
     }
     await connection.execute(
-      "UPDATE subscriptions SET status = 'ACTIVE', next_billing_at = ? WHERE id = ?",
-      [mysqlUtc(new Date(`${subscription.start_date}T00:00:00Z`)), id],
+      "UPDATE subscriptions SET status = 'ACTIVE', next_billing_at = ?, billing_anchor_day = ? WHERE id = ?",
+      [mysqlUtc(new Date(`${subscription.start_date}T00:00:00Z`)), Number(subscription.start_date.slice(8, 10)), id],
     );
     await recordEvent(
       connection,
@@ -953,8 +953,8 @@ export async function resumeSubscription(
     if (subscription.next_billing_at !== null && pausedAt !== null) {
       const next = new Date(parseUtc(subscription.next_billing_at).getTime() + shiftedMs);
       await connection.execute(
-        "UPDATE subscriptions SET status = 'ACTIVE', paused_at = NULL, next_billing_at = ? WHERE id = ?",
-        [mysqlUtc(next), id],
+        "UPDATE subscriptions SET status = 'ACTIVE', paused_at = NULL, next_billing_at = ?, billing_anchor_day = ? WHERE id = ?",
+        [mysqlUtc(next), next.getUTCDate(), id],
       );
     } else {
       await connection.execute(
