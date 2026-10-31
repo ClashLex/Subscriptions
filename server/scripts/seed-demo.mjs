@@ -55,10 +55,10 @@ const weeklyPlan = (await post("plans", {
   name: `Brightloop Weekly ${suffix}`, price: "249.00", billingIntervalUnit: "WEEK",
   billingIntervalCount: 1, minimumQuantity: 1, availableFrom: "2020-01-01", availableUntil: "2099-12-31",
 }, cookie)).data;
-await post("quotation-templates", {
+const template = (await post("quotation-templates", {
   name: `Premium launch ${suffix}`, validityDays: 10, defaultPlanId: plan.id,
   items: [{ productId: product.id, variantId: variant.id, quantity: 1, taxId: tax.id }],
-}, cookie);
+}, cookie)).data;
 await post("discounts", {
   name: `Demo loyalty ${suffix}`, discountType: "PERCENTAGE", value: "10.00",
   scope: "PRODUCTS", productIds: [product.id], usageLimit: 2,
@@ -113,11 +113,19 @@ for (const [session, ownId, otherId] of [
 const credentialFile = new URL("../../demo-credentials.txt", import.meta.url);
 await writeFile(credentialFile, [
   "Local Brightloop demo records (keep this file private)",
+  `Demo marker: ${suffix}`,
   `Customer: ${customerEmail} / ${customerPassword}`,
   `Second customer: ${secondCustomerEmail} / ${secondCustomerPassword}`,
   `Staff: ${staffEmail} / ${staffPassword}`,
+  `Product ID: ${product.id}`,
+  `Variant ID: ${variant.id}`,
+  `Monthly plan ID: ${plan.id}`,
+  `Weekly plan ID: ${weeklyPlan.id}`,
+  `Quotation template ID: ${template.id}`,
   `Partially paid invoice: ${firstInvoice.invoiceNumber}`,
+  `Partially paid invoice ID: ${firstInvoice.invoiceId}`,
   `Fully paid invoice: ${paidInvoice.invoiceNumber}`,
+  `Fully paid invoice ID: ${paidInvoice.invoiceId}`,
   `Active subscription ready for Run billing: ${dueId}`,
   "Sign in as Admin to show Overview, Invoices & billing, Discounts, and Payments.",
   "",

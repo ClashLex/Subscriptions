@@ -20,13 +20,13 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-slate-100">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold tracking-tight text-slate-900">Subscriptions</span>
             <Badge tone="indigo">Back office</Badge>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-600">{session.user?.email}</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="max-w-24 truncate text-sm text-slate-600 sm:max-w-none" title={session.user?.email}>{session.user?.email}</span>
             <Badge tone={session.isAdmin ? "indigo" : "slate"}>{session.user?.role ?? ""}</Badge>
             <Button variant="secondary" onClick={() => void session.logout()}>
               Sign out

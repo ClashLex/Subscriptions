@@ -13,7 +13,7 @@ The application is under active development. The table separates features availa
 | Browser | Sign in, customer registration and password reset; Admin and Staff catalogue, tax, plan, quotation template, subscription, invoice, payment, and discount screens; finance overview; customer subscription, invoice, and payment views; printable invoices. |
 | API | Authentication and roles; customer directory; catalogue and plans; quotation and subscription lifecycle; discount rules; recurring invoice generation; invoice reads, confirmation, cancellation, and email delivery; payment recording and reads; finance summary. |
 | Billing trigger | Admin-only **Run billing** control on the invoice screen, `POST /api/v1/billing/run`, or an optional in-process scheduler. The scheduler is disabled by default. |
-| Remaining work | External SMTP delivery and deployment checks, billing concurrency coverage, and any PDF email attachment required by the final submission. |
+| Remaining work | Verify a real hosted deployment and external SMTP provider when available; add a PDF email attachment only if the submission requires one. |
 
 The main workflow is: configure a product and plan, create a customer subscription, submit and confirm its quotation, activate it, run billing when due, confirm the invoice, and record payments. Admins run billing from **Invoices & billing**. Admins and Staff can review invoices, confirm or cancel eligible invoices, record payments, search payment history, print or save an invoice as a PDF through the browser, and email a confirmed or paid invoice link when SMTP is configured. The **Overview** shows dated invoiced and received amounts plus current outstanding and overdue balances. Admins create, edit, activate, and deactivate discount rules; Staff can read active rules.
 
@@ -96,7 +96,7 @@ For a compiled API run, execute `npm.cmd run build` and then `npm.cmd run start`
 
 Subscriptions follow **Draft → Quotation → Confirmed → Active**. Active subscriptions may be paused, resumed, closed, or renewed according to plan policy. Invoice generation snapshots line prices, tax, and any eligible discount. A unique database key prevents duplicate invoices for the same subscription period. Payments can cover part or all of a confirmed invoice; overpayments are rejected.
 
-The optional scheduler uses `BILLING_RUN_INTERVAL_MINUTES` in `.env`. A positive value starts periodic runs after the configured interval. Leave it blank or set it to `0` to use only the Admin API trigger. The scheduler has not yet been verified in a live deployment.
+The optional scheduler uses `BILLING_RUN_INTERVAL_MINUTES` in `.env`. A positive value starts periodic runs after the configured interval. Leave it blank or set it to `0` to use only the Admin API trigger. A dedicated local API run verified that the scheduler created an invoice on its first tick with a system audit event; a hosted scheduler has not been verified.
 
 Monthly and yearly billing keeps the contract's anniversary day when a shorter month forces a temporary earlier date. Pausing and resuming a subscription shifts its next due date and sets a new anniversary day from that shifted date.
 
@@ -112,13 +112,15 @@ Monthly and yearly billing keeps the contract's anniversary day when a shorter m
 
 Billing is repeat-safe for an already invoiced subscription period. The browser's **Run billing** button affects every currently due subscription, so review the reported failures and server log after a run.
 
-Password reset uses SMTP when configured. In local development without SMTP, the reset link is logged by the server and returned to the browser as a development link.
+Password reset uses SMTP when configured. In local development without SMTP, the reset link is logged by the server and returned to the browser as a development link. In production without SMTP, the API does not log or return the reset token.
 
 Invoice email requires `SMTP_HOST` and a suitable `MAIL_FROM` in `.env`. Without SMTP, the **Email customer** action returns an error and does not log invoice data. It sends a portal link, without a PDF attachment. Customers must sign in to open the link; the API checks invoice ownership. The SMTP capture test verifies message content locally; delivery through a real external provider still needs checking with the deployment credentials.
 
 ### Prepare local demo records
 
 With the API and database running, run `npm.cmd run seed:demo` from `server/`. This creates two fictional customers, a Staff account, a product and variant, monthly and weekly plans, a quotation template, tax and discount, partially and fully paid invoices, and an active subscription ready for the Admin **Run billing** action. The two customers let you demonstrate that each sees only their own records. The script writes generated sign-in details and record IDs to the Git-ignored `demo-credentials.txt` at the repository root. Use a local demo database; each run creates another dataset.
+
+For a full automated rehearsal, keep the API and Vite running, install Microsoft Edge, and run `npm.cmd run rehearse:demo` from `server/`. It seeds a dataset, runs the browser through billing twice, invoice confirmation, partial and full payments, an overpayment error, dashboard views, two customer accounts, and 390 px and 320 px layouts. It then seeds a fresh dataset so the credentials file points to an active subscription still ready for the live demo. The Admin **Run billing** action affects every due subscription in the database; use a local demo database.
 
 ## Checks
 
@@ -129,9 +131,11 @@ npm.cmd run test:auth
 npm.cmd run test:catalogue
 npm.cmd run test:subscriptions
 npm.cmd run test:billing
+npm.cmd run test:concurrency
+npm.cmd run test:scheduler
 ```
 
-The API acceptance scripts create test records in the configured database, so use a local test or demo database. `test:finance:unit`, `test:billing:unit`, and `test:email:unit` run without a database after building the server. The email check captures one message in a local SMTP server. The billing unit check covers interval date math; the live billing suite covers daily billing and repeated monthly/yearly periods. Concurrent billing and scheduler execution still need live checks.
+The API acceptance scripts create test records in the configured database, so use a local test or demo database. `test:concurrency` runs overlapping billing and payment requests and checks invoice/payment rows in MySQL. `test:scheduler` starts a separate API with a one-minute billing interval and waits for its invoice and system audit event. `test:finance:unit`, `test:billing:unit`, and `test:email:unit` run without a database after building the server. The email checks capture one message in a local SMTP server and ensure production does not expose reset tokens without SMTP. The billing unit check covers interval date math; the live billing suite covers daily billing and repeated monthly/yearly periods.
 
 The checks below do not require the running API:
 
@@ -150,6 +154,8 @@ npm.cmd run build
 ```
 
 For the browser workflow check, keep the API and Vite running and install Microsoft Edge on the test machine. From `client/`, run `npm.cmd run test:e2e`. This Playwright check exercises Admin, Customer, and Staff views, including a rendered invoice PDF. It creates test records in the local database. Run `npm.cmd run test:performance` from `server/` to measure finance summary and list responses with 1,000 temporary records; the script deletes its fixture after the run. These are local checks, not production load results.
+
+To check a production-like setup locally, run `npm.cmd run test:deployment` from `server/`. It requires OpenSSL (or `OPENSSL_BIN`), Microsoft Edge, MySQL, and the installed dependencies. The script builds both apps, checks migration 008, starts a production-mode API and browser bundle behind a temporary HTTPS reverse proxy, then tests health, CORS, Secure session cookies, browser billing, PDF output, and invoice delivery to a local SMTP capture server. It removes the temporary certificate after the run. No hosted environment or external SMTP provider is configured here, so this check does not establish their behaviour.
 
 The [changelog](docs/CHANGELOG.md) records verification evidence and remaining gaps. Live API acceptance scripts need a running MySQL server and API.
 

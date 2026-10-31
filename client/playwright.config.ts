@@ -5,10 +5,11 @@ export default defineConfig({
   workers: 1,
   timeout: 60_000,
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:5173",
     browserName: "chromium",
     channel: "msedge",
     headless: true,
+    ignoreHTTPSErrors: process.env.E2E_IGNORE_HTTPS_ERRORS === "1",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

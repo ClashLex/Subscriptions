@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { SMTPServer } from "smtp-server";
 
+process.env.DB_HOST ??= "127.0.0.1";
+process.env.DB_NAME ??= "unit_test";
+process.env.DB_USER ??= "unit_test";
+process.env.DB_PASSWORD ??= "unit-test-db-password";
+process.env.SESSION_SECRET ??= "unit-test-session-secret-at-least-32-chars";
+
 const captured = [];
 const smtp = new SMTPServer({
   authOptional: true,

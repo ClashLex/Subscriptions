@@ -2,6 +2,8 @@ import { expect, request, test, type APIRequestContext } from "@playwright/test"
 
 const admin = { email: process.env.SEED_ADMIN_EMAIL, password: process.env.SEED_ADMIN_PASSWORD };
 const customerPassword = "Portal-Pass1!";
+const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:5173";
+const ignoreHTTPSErrors = process.env.E2E_IGNORE_HTTPS_ERRORS === "1";
 
 async function post<T>(api: APIRequestContext, path: string, body: unknown): Promise<T> {
   const response = await api.post(path, { data: body });
@@ -14,8 +16,8 @@ test("admin and customer can follow an invoice through billing and payment", asy
   expect(admin.email && admin.password, "Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD in .env").toBeTruthy();
   const suffix = Date.now().toString(36);
   const customerEmail = `browser.${suffix}@demo.test`;
-  const anonymousApi = await request.newContext({ baseURL: "http://127.0.0.1:4000/api/v1/" });
-  const adminApi = await request.newContext({ baseURL: "http://127.0.0.1:4000/api/v1/" });
+  const anonymousApi = await request.newContext({ baseURL: `${baseURL}/api/v1/`, ignoreHTTPSErrors });
+  const adminApi = await request.newContext({ baseURL: `${baseURL}/api/v1/`, ignoreHTTPSErrors });
   try {
     const customer = await post<{ user: { id: number } }>(anonymousApi, "auth/register", {
       email: customerEmail, password: customerPassword,
@@ -48,9 +50,17 @@ test("admin and customer can follow an invoice through billing and payment", asy
     await page.getByLabel("Password").fill(admin.password!);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.getByRole("heading", { name: "Finance overview" })).toBeVisible();
+    if (baseURL.startsWith("https://")) {
+      const sessionCookie = (await page.context().cookies()).find((cookie) => cookie.name === "subscriptions.sid");
+      expect(sessionCookie?.secure, "Production session cookie must be Secure").toBe(true);
+    }
     await page.goto(`/admin/invoices?open=${invoiceId}`);
     await expect(page.getByRole("heading", { name: billed!.invoiceNumber })).toBeVisible();
     await expect(page.getByText("₹80.00")).toBeVisible();
+    if (process.env.E2E_SMTP_CAPTURE === "1") {
+      await page.getByRole("button", { name: "Email customer" }).click();
+      await expect(page.getByText(`Invoice email sent to ${customerEmail}.`)).toBeVisible();
+    }
     const [printPage] = await Promise.all([
       page.waitForEvent("popup"),
       page.getByRole("link", { name: "Print / save PDF" }).click(),

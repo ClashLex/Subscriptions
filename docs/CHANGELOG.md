@@ -6,6 +6,14 @@ All notable project, documentation, and implementation changes should be recorde
 
 ## [Unreleased]
 
+### Fixed and verified — 2026-10-31 (concurrency, scheduler, local deployment, demo)
+
+- Added a live concurrency script. Four overlapping billing runs produced one invoice and one creation report. Two competing full payments accepted exactly one; two simultaneous partial payments settled a second invoice exactly. MySQL invoice and payment rows were checked.
+- Added a scheduler integration script that launched a separate API with a one-minute interval. Its first tick created the fixture invoice, stored a system actor on the `INVOICED` event, and used the expected product-line amount.
+- Added a local production-like HTTPS check. The compiled API, migration 008, Vite production bundle, reverse proxy, health and CORS responses, Secure session cookie, Admin/Customer/Staff browser workflow, invoice PDF, and invoice email through the API to a local SMTP capture server passed. No hosted deployment or external SMTP provider was available; their behaviour remains unverified.
+- Fixed production password-reset fallback so an unset SMTP transport does not log a reset token. A unit check confirms production neither logs nor returns the link. Development fallback remains available.
+- Added an automated seeded demo rehearsal. It exercised catalogue and subscription views, two billing runs without a duplicate, invoice confirmation, partial and full payments, overpayment feedback, finance overview, role redirects, and two-customer isolation. The run exposed horizontal overflow at 390 px; responsive Admin and portal headers were fixed, and the rehearsal passed at 390 px and 320 px. `rehearse:demo` leaves a fresh due dataset for the live demo.
+
 ### Fixed and verified — 2026-10-31 (billing cadence and live workflow)
 
 - Added migration 008 and stored each subscription's billing anniversary day. Monthly billing now returns to the original day after a short month, yearly February 29 billing returns on leap years, and resume sets a new anchor from the shifted due date. The migration applied successfully to the local MySQL database.
@@ -14,7 +22,6 @@ All notable project, documentation, and implementation changes should be recorde
 - Added a local SMTP capture check for actual Nodemailer invoice delivery, recipient, invoice amount, and portal link; it passed without sending mail outside the machine. External SMTP delivery remains unverified. A PDF attachment is not part of the current invoice email.
 - Added a temporary 1,000-record finance benchmark. Summary, invoice list, and payment list p95 values were 9.1 ms, 7.8 ms, and 12.4 ms respectively across 20 local requests each; finance deltas and an overdue-query EXPLAIN were checked, and the fixture was removed. These timings describe this local Docker setup only.
 - Added `seed:demo` and ran it against the local database, creating two fictional customers, a Staff account, product variant, monthly and weekly plans, a quotation template, discount, partial and full payments, and a due subscription. The seed run verifies repeat billing creates no duplicate invoice and each customer is denied the other's invoice. Generated credentials and record IDs are saved to Git-ignored `demo-credentials.txt`. An npm override now keeps transitive `mysql2` on the declared patched version; server `npm audit --audit-level=moderate` reported zero vulnerabilities after install.
-- Remaining live checks: concurrent billing, optional scheduler execution, external SMTP provider delivery, and deployed environment behaviour.
 
 ### Added — 2026-10-31 (invoice delivery and print)
 

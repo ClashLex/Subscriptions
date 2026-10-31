@@ -42,8 +42,10 @@ export async function sendPasswordResetEmail(to: string, rawToken: string): Prom
   const transport = getTransport();
 
   if (!transport) {
-    // eslint-disable-next-line no-console
-    console.error(`[email:dev-fallback] Password reset link for ${to}: ${resetUrl}`);
+    if (env.NODE_ENV === "development") {
+      // eslint-disable-next-line no-console
+      console.error(`[email:dev-fallback] Password reset link for ${to}: ${resetUrl}`);
+    }
     return {
       delivered: false,
       ...(env.NODE_ENV === "development" ? { devUrl: resetUrl } : {}),

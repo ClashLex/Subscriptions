@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "test:api": "node --experimental-strip-types scripts/test-api.mjs",
     "test:e2e": "node --env-file=../.env node_modules/@playwright/test/cli.js test",
+    "test:demo": "node --env-file=../.env node_modules/@playwright/test/cli.js test --config=playwright.demo.config.ts",
     "lint": "oxlint",
     "preview": "vite preview"
   },
