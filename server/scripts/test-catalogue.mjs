@@ -70,6 +70,14 @@ await step("health ready", async () => {
   assert.equal(r.status, 200);
 });
 
+await step("anonymous GET /plans → 401 (no role fallthrough)", async () => {
+  jar.clear();
+  const r = await req("GET", "/plans");
+  assert.equal(r.status, 401, P(r));
+  const detail = await req("GET", "/plans/1");
+  assert.equal(detail.status, 401, P(detail));
+});
+
 await step("Admin login", async () => {
   jar.clear();
   const r = await req("POST", "/auth/login", { body: admin });

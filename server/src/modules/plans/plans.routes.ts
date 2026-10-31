@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { AppError, asyncHandler } from "../../middleware/errors.js";
-import { requireAdmin } from "../auth/auth.middleware.js";
+import { requireAdmin, requireAuth } from "../auth/auth.middleware.js";
 import { planCreateSchema, planQuerySchema, planUpdateSchema } from "./plans.schemas.js";
 import {
   createPlan,
@@ -14,6 +14,10 @@ import {
 import type { UserRole } from "../auth/auth.repository.js";
 
 export const plansRouter = Router();
+
+// Every plan endpoint requires a session; an anonymous request must never
+// fall through to an Admin/Staff visibility branch.
+plansRouter.use(requireAuth);
 
 const idParam = z.coerce.number().int().positive();
 
