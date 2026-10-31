@@ -43,6 +43,8 @@
     "seed": "tsx scripts/seed.ts",
     "typecheck": "tsc --noEmit",
     "test:auth": "node --env-file=../.env scripts/test-auth.mjs",
-    "test:catalogue": "node --env-file=../.env scripts/test-catalogue.mjs"
+    "test:catalogue": "node --env-file=../.env scripts/test-catalogue.mjs",
+    "test:subscriptions": "node --env-file=../.env scripts/test-subscriptions.mjs",
+    "debugfetch": "node --env-file=../.env scripts/debug-fetch.mjs"
   }
 }

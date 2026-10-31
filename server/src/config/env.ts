@@ -23,6 +23,11 @@ const envSchema = z.object({
   APP_URL: z.string().url().default("http://localhost:5173"),
   API_URL: z.string().url().default("http://localhost:4000"),
 
+  // Global API rate-limit ceiling per 5-minute window. The default is a sane
+  // production value; demo/report environments raise it via .env because
+  // acceptance suites issue hundreds of requests in quick succession.
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+
   DB_HOST: z.string().min(1, "DB_HOST is required"),
   DB_PORT: z.coerce.number().int().positive().default(3306),
   DB_NAME: z.string().min(1, "DB_NAME is required"),

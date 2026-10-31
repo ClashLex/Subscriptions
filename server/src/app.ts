@@ -11,6 +11,8 @@ import { usersRouter } from "./modules/users/users.routes.js";
 import { productsRouter } from "./modules/products/products.routes.js";
 import { taxesRouter } from "./modules/taxes/taxes.routes.js";
 import { plansRouter } from "./modules/plans/plans.routes.js";
+import { templatesRouter } from "./modules/quotations/quotations.routes.js";
+import { subscriptionsRouter } from "./modules/subscriptions/subscriptions.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/errors.js";
 
 const MySQLStore = MySQLStoreFactory(session);
@@ -27,7 +29,7 @@ export function createApp(): Express {
   app.use(
     rateLimit({
       windowMs: 5 * 60 * 1000,
-      limit: 300,
+      limit: env.RATE_LIMIT_MAX,
       standardHeaders: "draft-7",
       legacyHeaders: false,
     }),
@@ -68,6 +70,8 @@ export function createApp(): Express {
   app.use("/api/v1/products", productsRouter);
   app.use("/api/v1/taxes", taxesRouter);
   app.use("/api/v1/plans", plansRouter);
+  app.use("/api/v1/quotation-templates", templatesRouter);
+  app.use("/api/v1/subscriptions", subscriptionsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

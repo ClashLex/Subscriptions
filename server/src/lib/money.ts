@@ -66,6 +66,22 @@ function negativeZero(value: bigint): bigint {
   return value < 0n ? -value : value;
 }
 
+/** Quantity scaling on exact units: "12.50" × 3 → "37.50". */
+export function multiplyMoney(value: string, quantity: number): string {
+  return fromCents(toCents(value) * BigInt(quantity));
+}
+
+/**
+ * Extracts the tax component already embedded in an INCLUSIVE amount:
+ * tax = amount × rate / (100 + rate), floored at the cent.
+ */
+export function inclusiveTaxComponent(value: string, rate: string): string {
+  const amount = toCents(value);
+  const rateCents = toCents(rate); // "18.00" → 1800 (percent × 100)
+  const tax = (amount * rateCents) / (10000n + rateCents);
+  return fromCents(tax);
+}
+
 /** max(a, b) over money strings. */
 export function maxMoney(a: string, b: string): string {
   return toCents(a) >= toCents(b) ? a : b;

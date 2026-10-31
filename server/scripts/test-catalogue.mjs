@@ -209,7 +209,7 @@ await step("Staff can read catalogue but cannot write", async () => {
   assert.equal(login.status, 200, P(login));
   const read = await req("GET", "/products");
   assert.equal(read.status, 200, P(read));
-  const pl = await req("GET", "/plans?includeInactive=1");
+  const pl = await req("GET", "/plans?includeInactive=1&pageSize=100");
   assert.equal(pl.status, 200, P(pl));
   const tx = await req("GET", "/taxes");
   assert.equal(tx.status, 200, P(tx));
@@ -226,10 +226,10 @@ await step("Customer cannot read catalogue but sees available plans", async () =
   assert.equal(login.status, 200, P(login));
   const read = await req("GET", "/products");
   assert.equal(read.status, 403, P(read));
-  const pl = await req("GET", "/plans");
+  const pl = await req("GET", "/plans?pageSize=100");
   assert.equal(pl.status, 200, P(pl));
   assert.ok(pl.json?.data?.some((row) => row.id === planId));
-  const plInactive = await req("GET", "/plans?includeInactive=1");
+  const plInactive = await req("GET", "/plans?includeInactive=1&pageSize=100");
   // includeInactive is ignored for customers — response must still exist, fine either way.
   assert.equal(plInactive.status, 200, P(plInactive));
 });
