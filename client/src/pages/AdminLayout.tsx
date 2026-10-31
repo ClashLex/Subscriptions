@@ -8,6 +8,8 @@ const NAV_ITEMS: Array<{ to: string; label: string }> = [
   { to: "/admin/products", label: "Products & variants" },
   { to: "/admin/plans", label: "Plans" },
   { to: "/admin/taxes", label: "Taxes" },
+  { to: "/admin/templates", label: "Quotation templates" },
+  { to: "/admin/subscriptions", label: "Subscriptions" },
 ];
 
 export function AdminLayout() {

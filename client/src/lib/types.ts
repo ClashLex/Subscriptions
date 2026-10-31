@@ -82,3 +82,122 @@ export function intervalLabel(unit: BillingIntervalUnit, count: number): string 
   const label = INTERVAL_UNITS.find((option) => option.value === unit)?.label ?? unit;
   return `${count} \u00D7 ${label}`;
 }
+
+// ---------------------------------------------------------------------------
+// Quotation templates & subscriptions (Phase 4)
+// ---------------------------------------------------------------------------
+
+export interface CustomerOption {
+  id: number;
+  email: string;
+  displayName: string | null;
+  companyName: string | null;
+  isActive: boolean;
+}
+
+export interface TemplateItem {
+  productId: number;
+  variantId: number | null;
+  productName: string;
+  variantName: string | null;
+  quantity: number;
+  unitPrice: string;
+  taxId: number | null;
+  taxName: string | null;
+}
+
+export interface QuotationTemplate {
+  id: number;
+  name: string;
+  validityDays: number;
+  defaultPlanId: number | null;
+  defaultPlanName: string | null;
+  items: TemplateItem[];
+}
+
+export type SubscriptionStatus =
+  | "DRAFT"
+  | "QUOTATION"
+  | "CONFIRMED"
+  | "ACTIVE"
+  | "PAUSED"
+  | "CLOSED";
+
+export interface SubscriptionListItem {
+  id: number;
+  subscriptionNumber: string;
+  customerId: number;
+  customerEmail: string;
+  planId: number;
+  planName: string;
+  status: SubscriptionStatus;
+  startDate: string | null;
+  expiryDate: string | null;
+  nextBillingAt: string | null;
+  previousSubscriptionId: number | null;
+}
+
+export interface SubscriptionLine {
+  id: number;
+  productId: number | null;
+  variantId: number | null;
+  description: string;
+  quantity: number;
+  unitPrice: string;
+  lineAmount: string;
+  taxId: number | null;
+  taxName: string | null;
+  taxRate: string | null;
+  taxMode: "EXCLUSIVE" | "INCLUSIVE" | null;
+}
+
+export interface SubscriptionEvent {
+  id: number;
+  eventType: string;
+  fromStatus: string | null;
+  toStatus: string | null;
+  reason: string | null;
+  actorEmail: string | null;
+  createdAt: string;
+}
+
+export interface SubscriptionTotals {
+  subtotal: string;
+  taxTotal: string;
+  total: string;
+}
+
+export interface SubscriptionDetail {
+  id: number;
+  subscriptionNumber: string;
+  customerId: number;
+  customerEmail: string;
+  planId: number;
+  planName: string;
+  billingIntervalUnit: BillingIntervalUnit;
+  billingIntervalCount: number;
+  templateId: number | null;
+  status: SubscriptionStatus;
+  startDate: string | null;
+  expiryDate: string | null;
+  paymentTermsDays: number;
+  nextBillingAt: string | null;
+  previousSubscriptionId: number | null;
+  pausedAt: string | null;
+  closedAt: string | null;
+  allowPause: boolean;
+  allowEarlyClose: boolean;
+  allowRenewal: boolean;
+  lines: SubscriptionLine[];
+  events: SubscriptionEvent[];
+  totals: SubscriptionTotals;
+}
+
+export const STATUS_LABELS: Record<SubscriptionStatus, string> = {
+  DRAFT: "Draft",
+  QUOTATION: "Quotation",
+  CONFIRMED: "Confirmed",
+  ACTIVE: "Active",
+  PAUSED: "Paused",
+  CLOSED: "Closed",
+};

@@ -27,6 +27,43 @@ export async function listUsers(limit = 25, offset = 0): Promise<{ rows: UserLis
   return { rows, total: Number(countRows[0]?.total ?? 0) };
 }
 
+export interface CustomerOptionRow {
+  id: number;
+  email: string;
+  displayName: string | null;
+  companyName: string | null;
+  isActive: boolean;
+}
+
+interface CustomerQueryRow extends RowDataPacket {
+  id: number;
+  email: string;
+  display_name: string | null;
+  company_name: string | null;
+  is_active: 0 | 1;
+}
+
+/**
+ * Minimal customer directory for staff tooling (subscription creation,
+ * filtering). Ids, contact names, and active flags only — no profile data.
+ * Added as a contract extension so Staff can fulfil their documented
+ * "Customers" navigation duty.
+ */
+export async function listCustomerOptions(): Promise<CustomerOptionRow[]> {
+  const rows = await query<CustomerQueryRow[]>(
+    `SELECT u.id, u.email, p.display_name, p.company_name, u.is_active
+     FROM users u LEFT JOIN customer_profiles p ON p.user_id = u.id
+     WHERE u.role = 'CUSTOMER' ORDER BY u.id`,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    companyName: row.company_name,
+    isActive: row.is_active === 1,
+  }));
+}
+
 /** Only Admin can add a staff member (REQUIREMENTS.md §2.1). */
 export async function createStaff(
   dto: z.infer<typeof staffCreateSchema>,

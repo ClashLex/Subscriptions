@@ -9,6 +9,8 @@ import { PortalPage } from "./pages/PortalPage.js";
 import { ProductsPage } from "./pages/admin/ProductsPage.js";
 import { PlansPage } from "./pages/admin/PlansPage.js";
 import { TaxesPage } from "./pages/admin/TaxesPage.js";
+import { TemplatesPage } from "./pages/admin/QuotationTemplatesPage.js";
+import { SubscriptionsPage } from "./pages/admin/SubscriptionsPage.js";
 import type { ReactNode } from "react";
 import type { Role } from "./lib/types.js";
 
@@ -62,6 +64,8 @@ export default function App() {
             <Route path="/admin/products" element={<ProductsPage />} />
             <Route path="/admin/plans" element={<PlansPage />} />
             <Route path="/admin/taxes" element={<TaxesPage />} />
+            <Route path="/admin/templates" element={<TemplatesPage />} />
+            <Route path="/admin/subscriptions" element={<SubscriptionsPage />} />
           </Route>
           <Route
             path="/portal"

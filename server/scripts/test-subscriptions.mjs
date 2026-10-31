@@ -420,6 +420,26 @@ await step("customer sees only own subscriptions and never writes", async () => 
   assert.equal(pause.status, 403, P(pause));
 });
 
+await step("staff can use the customer directory; customers cannot", async () => {
+  jar.clear();
+  assert.equal((await req("POST", "/auth/login", { body: admin })).status, 200);
+  // switch to staff session
+  jar.clear();
+  assert.equal((await req("POST", "/auth/login", { body: { email: staffUser.email, password: staffUser.password } })).status, 200);
+  const staffList = await req("GET", "/users/customers");
+  assert.equal(staffList.status, 200, P(staffList));
+  assert.ok((staffList.json?.data ?? []).some((row) => row.id === customer1Id));
+  jar.clear();
+  assert.equal((await req("POST", "/auth/login", {
+    body: { email: `cust.a4.${run}@demo.test`, password: "Cust0mer-Pass!" },
+  })).status, 200);
+  const asCustomer = await req("GET", "/users/customers");
+  assert.equal(asCustomer.status, 403, P(asCustomer));
+  // end as admin for the remaining steps
+  jar.clear();
+  assert.equal((await req("POST", "/auth/login", { body: admin })).status, 200);
+});
+
 await step("list filters by status", async () => {
   jar.clear();
   assert.equal((await req("POST", "/auth/login", { body: admin })).status, 200);

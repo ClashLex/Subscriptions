@@ -1,14 +1,26 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errors.js";
-import { requireAdmin } from "../auth/auth.middleware.js";
+import { requireAdmin, requireStaffOrAdmin } from "../auth/auth.middleware.js";
 import { staffCreateSchema, userStatusSchema } from "./users.schemas.js";
-import { createStaff, listUsers, setAccountStatus } from "./users.service.js";
+import { createStaff, listCustomerOptions, listUsers, setAccountStatus } from "./users.service.js";
 
 /**
- * Admin user management. Both routes require ADMIN on the backend even if a
- * UI hides the buttons (SECURITY_AND_ACCESS.md §6).
+ * Admin user management.Both routes require ADMIN on the backend even if a
+ * UI hides the buttons (SECURITY_AND_ACCESS.md §6). The one exception below
+ * is the staff-reachable customer directory used by subscription tooling.
  */
 export const usersRouter = Router();
+
+// Staff/admin need a minimal customer picker for subscriptions; keep it
+// before the Admin-only block (which otherwise guards the whole router).
+usersRouter.get(
+  "/customers",
+  requireStaffOrAdmin,
+  asyncHandler(async (_req, res) => {
+    const customers = await listCustomerOptions();
+    res.status(200).json({ data: customers });
+  }),
+);
 
 usersRouter.use(requireAdmin);
 

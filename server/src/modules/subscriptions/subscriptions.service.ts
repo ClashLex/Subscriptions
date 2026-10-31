@@ -70,6 +70,23 @@ export interface SubscriptionListRow extends RowDataPacket {
   previous_subscription_id: number | null;
 }
 
+/** Client-facing camelCase DTO for list rows (same shape as the UI types). */
+export function listRowDto(row: SubscriptionListRow) {
+  return {
+    id: row.id,
+    subscriptionNumber: row.subscription_number,
+    customerId: row.customer_id,
+    customerEmail: row.customer_email,
+    planId: row.plan_id,
+    planName: row.plan_name,
+    status: row.status,
+    startDate: row.start_date,
+    expiryDate: row.expiry_date,
+    nextBillingAt: row.next_billing_at,
+    previousSubscriptionId: row.previous_subscription_id,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Shared DTO helpers
 // ---------------------------------------------------------------------------
@@ -366,15 +383,30 @@ export interface SubscriptionDetail {
   previousSubscriptionId: number | null;
   pausedAt: string | null;
   closedAt: string | null;
+  allowPause: boolean;
+  allowEarlyClose: boolean;
+  allowRenewal: boolean;
   lines: ReturnType<typeof lineDto>[];
   events: ReturnType<typeof eventDto>[];
   totals: SubscriptionTotals;
 }
 
 export async function getSubscriptionDetail(id: number): Promise<SubscriptionDetail | null> {
-  const rows = await query<Array<SubscriptionRow & RowDataPacket & { customer_email: string; plan_name: string }>>(
+  const rows = await query<
+    Array<
+      SubscriptionRow &
+        RowDataPacket & {
+          customer_email: string;
+          plan_name: string;
+          allow_pause: 0 | 1;
+          allow_early_close: 0 | 1;
+          allow_renewal: 0 | 1;
+        }
+    >
+  >(
     `SELECT s.*, u.email AS customer_email, p.name AS plan_name,
-            p.billing_interval_unit, p.billing_interval_count
+            p.billing_interval_unit, p.billing_interval_count,
+            p.allow_pause, p.allow_early_close, p.allow_renewal
      FROM subscriptions s
      JOIN users u ON u.id = s.customer_id
      JOIN plans p ON p.id = s.plan_id
@@ -405,6 +437,9 @@ export async function getSubscriptionDetail(id: number): Promise<SubscriptionDet
     previousSubscriptionId: row.previous_subscription_id,
     pausedAt: row.paused_at,
     closedAt: row.closed_at,
+    allowPause: row.allow_pause === 1,
+    allowEarlyClose: row.allow_early_close === 1,
+    allowRenewal: row.allow_renewal === 1,
     lines: lines.map(lineDto),
     events: events.map(eventDto),
     totals: cleanTotals(lines),
@@ -416,7 +451,7 @@ export async function listSubscriptions(options: {
   offset: number;
   status?: SubscriptionStatus;
   customerId?: number;
-}): Promise<{ rows: SubscriptionListRow[]; total: number }> {
+}): Promise<{ rows: ReturnType<typeof listRowDto>[]; total: number }> {
   const conditions: string[] = [];
   const params: unknown[] = [];
   if (options.status !== undefined) {
@@ -428,7 +463,7 @@ export async function listSubscriptions(options: {
     params.push(options.customerId);
   }
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  const rows = await query<SubscriptionListRow[]>(
+  const rawRows = await query<SubscriptionListRow[]>(
     `SELECT s.id, s.subscription_number, s.customer_id, u.email AS customer_email,
             s.plan_id, p.name AS plan_name, s.status, s.start_date, s.expiry_date,
             s.next_billing_at, s.previous_subscription_id
@@ -443,7 +478,7 @@ export async function listSubscriptions(options: {
     `SELECT COUNT(*) AS total FROM subscriptions s ${where}`,
     params,
   );
-  return { rows, total: Number(countRows[0]?.total ?? 0) };
+  return { rows: rawRows.map(listRowDto), total: Number(countRows[0]?.total ?? 0) };
 }
 
 // ---------------------------------------------------------------------------
