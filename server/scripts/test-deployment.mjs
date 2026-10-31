@@ -120,6 +120,8 @@ try {
   try {
     const [columns] = await connection.query("SHOW COLUMNS FROM subscriptions LIKE 'billing_anchor_day'");
     assert.equal(columns.length, 1, "Required billing migration 008 has not been applied.");
+    const [addOnColumns] = await connection.query("SHOW COLUMNS FROM subscription_lines LIKE 'is_enabled'");
+    assert.equal(addOnColumns.length, 1, "Required add-on migration 009 has not been applied.");
   } finally {
     await connection.end();
   }
@@ -156,10 +158,15 @@ try {
       hostname: "127.0.0.1", port: target, path: request.url, method: request.method,
       headers: { ...request.headers, "x-forwarded-proto": "https", "x-forwarded-host": request.headers.host },
     }, (upstreamResponse) => {
+      if (response.destroyed) { upstreamResponse.destroy(); return; }
       response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.headers);
       upstreamResponse.pipe(response);
     });
-    upstream.on("error", (error) => { response.writeHead(502); response.end(error.message); });
+    upstream.on("error", (error) => {
+      if (response.destroyed) return;
+      if (response.headersSent) response.destroy(error);
+      else { response.writeHead(502); response.end(error.message); }
+    });
     request.pipe(upstream);
   });
   await new Promise((done) => proxy.listen(edgePort, "127.0.0.1", done));

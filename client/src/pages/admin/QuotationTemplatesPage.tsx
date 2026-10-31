@@ -64,6 +64,7 @@ export function TemplatesPage() {
         variantId: row.variantId ?? undefined,
         quantity: Math.max(Number.parseInt(row.quantity, 10) || 1, 1),
         taxId: row.taxId ?? undefined,
+        isAddOn: row.isAddOn,
       }));
     const body = {
       name: editor.draft.name.trim(),
@@ -100,6 +101,7 @@ export function TemplatesPage() {
         variantId: item.variantId,
         quantity: String(item.quantity),
         taxId: item.taxId,
+        isAddOn: item.isAddOn,
       })),
     });
   }
@@ -108,7 +110,7 @@ export function TemplatesPage() {
     <div>
       <PageHeading
         title="Quotation templates"
-        subtitle="Reusable offer bundles; item unit prices snapshot here when saved."
+        subtitle="Reusable offer bundles. Add-ons keep their catalogue snapshot; the first core line uses the selected plan price when a subscription is created."
       />
       <div className="mb-4 flex items-center justify-between">
         <span className="text-sm text-slate-500">{rows === null ? "Loading…" : `${rows.length} template(s)`}</span>

@@ -163,7 +163,7 @@ export function PlansPage() {
     <div>
       <PageHeading
         title="Plans"
-        subtitle="Plan price is a reference amount. Recurring invoices use subscription line prices, discounts, and taxes."
+        subtitle="Plan price sets the first core subscription line's recurring price; optional add-ons use catalogue prices."
       />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Checkbox
@@ -182,7 +182,7 @@ export function PlansPage() {
         head={
           <tr>
             <th className="px-3 py-2">Name</th>
-            <th className="px-3 py-2">Reference price</th>
+            <th className="px-3 py-2">Recurring price</th>
             <th className="px-3 py-2">Billing</th>
             <th className="px-3 py-2">Min qty</th>
             <th className="px-3 py-2">Availability</th>
@@ -270,7 +270,7 @@ export function PlansPage() {
               />
             </Field>
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Reference price (not billed)">
+              <Field label="Primary line recurring price">
                 <TextInput
                   required
                   inputMode="decimal"

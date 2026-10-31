@@ -152,7 +152,7 @@ await step("direct subscription → DRAFT with snapshots and totals", async () =
       paymentTermsDays: 14,
       lines: [
         { productId, quantity: 1, taxId: taxExclusiveId },
-        { productId, variantId, quantity: 2, taxId: taxInclusiveId },
+        { productId, variantId, quantity: 2, taxId: taxInclusiveId, isAddOn: true },
       ],
     },
   });
@@ -160,13 +160,12 @@ await step("direct subscription → DRAFT with snapshots and totals", async () =
   s1 = r.json?.data;
   assert.match(s1?.subscriptionNumber ?? "", /^SUB-\d{6}$/);
   assert.equal(s1?.status, "DRAFT");
-  assert.equal(s1?.lines?.[0]?.unitPrice, "100.00");
+  assert.equal(s1?.lines?.[0]?.unitPrice, "500.00");
   assert.equal(s1?.lines?.[1]?.unitPrice, "80.00");
   assert.equal(s1?.lines?.[1]?.taxMode, "INCLUSIVE");
-  assert.equal(s1?.totals?.subtotal, "260.00");
-  // L1 adds 18% of 100.00 = 18.00 on top; L2 (5% INCLUSIVE) extracts 160.00 × 5/105 = 7.61.
-  assert.equal(s1?.totals?.taxTotal, "25.61");
-  assert.equal(s1?.totals?.total, "278.00");
+  assert.equal(s1?.totals?.subtotal, "660.00");
+  assert.equal(s1?.totals?.taxTotal, "97.61");
+  assert.equal(s1?.totals?.total, "750.00");
   assert.equal(s1?.events?.[0]?.eventType, "CREATED");
 });
 
@@ -174,7 +173,7 @@ await step("catalogue price change does not rewrite line snapshots", async () =>
   const patch = await req("PATCH", `/products/${productId}`, { body: { salesPrice: "150.00" } });
   assert.equal(patch.status, 200, P(patch));
   const detail = await req("GET", `/subscriptions/${s1.id}`);
-  assert.equal(detail.json?.data?.lines?.[0]?.unitPrice, "100.00");
+  assert.equal(detail.json?.data?.lines?.[0]?.unitPrice, "500.00");
   assert.equal(detail.json?.data?.lines?.[1]?.unitPrice, "80.00");
 });
 
@@ -341,7 +340,10 @@ await step("renewal creates a linked draft and preserves history", async () => {
   assert.equal(renewed?.customerId, s2.customerId);
   // Renewal copies the agreed snapshot instead of re-resolving the catalogue.
   assert.equal(renewed?.lines?.[0]?.unitPrice, s2.lines?.[0]?.unitPrice);
-  assert.equal(renewed?.lines?.[0]?.unitPrice, "150.00");
+  assert.equal(renewed?.lines?.[0]?.unitPrice, "100.00");
+  const again = await req("POST", `/subscriptions/${s2.id}/renew`, { body: {} });
+  assert.equal(again.status, 409, P(again));
+  assert.equal(again.json?.error?.code, "ALREADY_RENEWED");
   const old = await req("GET", `/subscriptions/${s2.id}`);
   assert.equal(old.json?.data?.status, "CLOSED");
 });
@@ -369,7 +371,7 @@ await step("template-driven subscription copies items and uses template validity
   assert.equal(r.status, 201, P(r));
   sTemplate = r.json?.data;
   assert.equal(sTemplate?.lines?.[0]?.quantity, 2);
-  assert.equal(sTemplate?.lines?.[0]?.unitPrice, "80.00");
+  assert.equal(sTemplate?.lines?.[0]?.unitPrice, "480.00");
   const submit = await req("POST", `/subscriptions/${sTemplate.id}/quotation`, { body: {} });
   assert.equal(submit.status, 200, P(submit));
   const expected = new Date();
@@ -445,7 +447,7 @@ await step("staff lifecycle: create allowed, close blocked by plan", async () =>
   assert.equal(templateBlocked.status, 201, P(templateBlocked));
 });
 
-await step("customer sees only own subscriptions and never writes", async () => {
+await step("customer manages own add-ons and lifecycle within plan policy", async () => {
   jar.clear();
   const login = await req("POST", "/auth/login", {
     body: { email: `cust.a4.${run}@demo.test`, password: "Cust0mer-Pass!" },
@@ -464,8 +466,21 @@ await step("customer sees only own subscriptions and never writes", async () => 
     body: { customerId: customer1Id, planId: planA, lines: [{ productId, quantity: 1 }] },
   });
   assert.equal(write.status, 403, P(write));
+  const foreignToggle = await req("PATCH", `/subscriptions/${s2.id}/add-ons/${s1.lines[1].id}`, { body: { enabled: false } });
+  assert.equal(foreignToggle.status, 404, P(foreignToggle));
+  const coreToggle = await req("PATCH", `/subscriptions/${s1.id}/add-ons/${s1.lines[0].id}`, { body: { enabled: false } });
+  assert.equal(coreToggle.status, 404, P(coreToggle));
+  const off = await req("PATCH", `/subscriptions/${s1.id}/add-ons/${s1.lines[1].id}`, { body: { enabled: false } });
+  assert.equal(off.status, 200, P(off));
+  assert.equal(off.json?.data?.lines?.[1]?.isEnabled, false);
+  assert.equal(off.json?.data?.totals?.total, "590.00");
+  const on = await req("PATCH", `/subscriptions/${s1.id}/add-ons/${s1.lines[1].id}`, { body: { enabled: true } });
+  assert.equal(on.status, 200, P(on));
+  assert.equal(on.json?.data?.totals?.total, "750.00");
   const pause = await req("POST", `/subscriptions/${s1.id}/pause`, { body: {} });
-  assert.equal(pause.status, 403, P(pause));
+  assert.equal(pause.status, 200, P(pause));
+  const resume = await req("POST", `/subscriptions/${s1.id}/resume`, { body: {} });
+  assert.equal(resume.status, 200, P(resume));
 });
 
 await step("staff can use the customer directory; customers cannot", async () => {

@@ -64,6 +64,7 @@ let tinyProductId;
 let taxId;
 let roundingTaxId;
 let planId;
+let tinyPlanId;
 let subscriptionId;
 let tinySubscriptionId;
 let invoiceId;
@@ -126,6 +127,13 @@ await step("admin setup: catalogue, plan, and eligible discount", async () => {
   });
   assert.equal(plan.status, 201, show(plan));
   planId = plan.json?.data?.id;
+  const tinyPlan = await req("POST", "/plans", { body: {
+    name: `Rounding daily ${run}`, price: "0.01", billingIntervalUnit: "DAY",
+    billingIntervalCount: 1, minimumQuantity: 1,
+    availableFrom: "2020-01-01", availableUntil: "2099-12-31",
+  } });
+  assert.equal(tinyPlan.status, 201, show(tinyPlan));
+  tinyPlanId = tinyPlan.json?.data?.id;
 
   const discount = await req("POST", "/discounts", {
     body: {
@@ -148,7 +156,7 @@ await step("create two active subscriptions due today", async () => {
     const created = await req("POST", "/subscriptions", {
       body: {
         customerId,
-        planId,
+        planId: fixture.key === "tiny" ? tinyPlanId : planId,
         startDate: today,
         lines: [{ productId: fixture.productId, quantity: 1, taxId: fixture.taxId }],
       },
@@ -196,7 +204,7 @@ await step("repeated billing run does not duplicate or re-advance periods", asyn
   assert.ok(invoiceId, "The first billing run must create an invoice before retrying.");
   const response = await req("POST", "/billing/run", { body: {} });
   assert.equal(response.status, 200, show(response));
-  assert.equal(response.json?.data?.invoices?.length, 0, show(response));
+  assert.ok(!response.json?.data?.invoices?.some((invoice) => invoice.subscriptionId === subscriptionId), show(response));
   const list = await req("GET", `/invoices?subscriptionId=${subscriptionId}&pageSize=100`);
   assert.equal(list.status, 200, show(list));
   assert.equal(list.json?.data?.length, 1, show(list));
@@ -296,7 +304,7 @@ await step("open-ended contract bills every due period (regression: one invoice 
       customerId,
       planId,
       startDate: yesterday,
-      lines: [{ productId, quantity: 1 }],
+      lines: [{ productId, quantity: 1 }, { productId: tinyProductId, quantity: 1, isAddOn: true }],
     },
   });
   assert.equal(created.status, 201, show(created));
@@ -316,12 +324,30 @@ await step("open-ended contract bills every due period (regression: one invoice 
     firstRun.json?.data?.invoices?.some((invoice) => invoice.subscriptionId === recurringId),
     show(firstRun),
   );
+  const firstInvoiceId = firstRun.json.data.invoices.find((invoice) => invoice.subscriptionId === recurringId).invoiceId;
+  const firstInvoice = await req("GET", `/invoices/${firstInvoiceId}`);
+  assert.equal(firstInvoice.json?.data?.grandTotal, "100.01", show(firstInvoice));
+  const contract = await req("GET", `/subscriptions/${recurringId}`);
+  const addOnId = contract.json?.data?.lines?.find((line) => line.isAddOn)?.id;
+  assert.ok(addOnId, show(contract));
+  jar.clear();
+  assert.equal((await req("POST", "/auth/login", { body: { email: `billing.${run}@demo.test`, password: "Billing-Pass1!" } })).status, 200);
+  const switchedOff = await req("PATCH", `/subscriptions/${recurringId}/add-ons/${addOnId}`, { body: { enabled: false } });
+  assert.equal(switchedOff.status, 200, show(switchedOff));
+  jar.clear();
+  assert.equal((await req("POST", "/auth/login", { body: admin })).status, 200);
   const secondRun = await req("POST", "/billing/run", { body: {} });
   assert.equal(secondRun.status, 200, show(secondRun));
   assert.ok(
     secondRun.json?.data?.invoices?.some((invoice) => invoice.subscriptionId === recurringId),
     show(secondRun),
   );
+  const secondInvoiceId = secondRun.json.data.invoices.find((invoice) => invoice.subscriptionId === recurringId).invoiceId;
+  const secondInvoice = await req("GET", `/invoices/${secondInvoiceId}`);
+  assert.equal(secondInvoice.json?.data?.grandTotal, "100.00", show(secondInvoice));
+  assert.equal(secondInvoice.json?.data?.lines?.length, 1, show(secondInvoice));
+  const firstAgain = await req("GET", `/invoices/${firstInvoiceId}`);
+  assert.equal(firstAgain.json?.data?.grandTotal, "100.01", show(firstAgain));
 
   const list = await req("GET", `/invoices?subscriptionId=${recurringId}&pageSize=100`);
   assert.equal(list.status, 200, show(list));

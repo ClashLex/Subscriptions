@@ -6,6 +6,15 @@ All notable project, documentation, and implementation changes should be recorde
 
 ## [Unreleased]
 
+### Improved against the supplied problem statement — 2026-10-31
+
+- Added migration 009 to classify core and optional product lines, track whether each subscription add-on is enabled, and preserve existing line prices and enabled state. Newly created subscriptions price their first core line from the plan plus a variant adjustment; other lines use catalogue or template prices.
+- Added customer and Staff/Admin add-on controls. Customer portal users can manage only their own active or paused add-ons and use pause, resume, close, and renewal actions allowed by the plan. Core lines cannot be switched off. Invoice generation skips disabled add-ons, and already issued invoices remain unchanged.
+- The live subscription and billing acceptance suites passed, including ownership, customer lifecycle policy, plan pricing, add-on switching across consecutive billing periods, and invoice history. The local production-like HTTPS browser check passed with customer add-on and pause/resume interactions, invoice PDF, Secure cookie, and SMTP invoice capture.
+- Expanded the local benchmark to 3,000 temporary subscriptions and invoices. Across 20 requests per endpoint, p95 was 15.5 ms for finance summary, 13.6 ms for subscriptions, 17.7 ms for invoices, and 17.5 ms for payments. This verifies the two-second target for those local paths only; hosted load remains untested.
+- Fixed the deployment check's proxy shutdown error and made it verify migration 009. External SMTP delivery and a hosted deployment remain unverified because neither is configured.
+- Renewal now rejects a second request for the same contract; the subscription acceptance suite verified the guard. Local SMTP capture verified both invoice and password reset delivery, and the scheduler check passed with the plan-priced core line.
+
 ### Fixed and verified — 2026-10-31 (concurrency, scheduler, local deployment, demo)
 
 - Added a live concurrency script. Four overlapping billing runs produced one invoice and one creation report. Two competing full payments accepted exactly one; two simultaneous partial payments settled a second invoice exactly. MySQL invoice and payment rows were checked.

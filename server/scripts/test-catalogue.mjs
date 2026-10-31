@@ -228,7 +228,13 @@ await step("Customer cannot read catalogue but sees available plans", async () =
   assert.equal(read.status, 403, P(read));
   const pl = await req("GET", "/plans?pageSize=100");
   assert.equal(pl.status, 200, P(pl));
-  assert.ok(pl.json?.data?.some((row) => row.id === planId));
+  let foundPlan = pl.json?.data?.some((row) => row.id === planId);
+  for (let page = 2; !foundPlan && page <= (pl.json?.meta?.totalPages ?? 1); page += 1) {
+    const next = await req("GET", `/plans?pageSize=100&page=${page}`);
+    assert.equal(next.status, 200, P(next));
+    foundPlan = next.json?.data?.some((row) => row.id === planId);
+  }
+  assert.ok(foundPlan, "The new available plan must appear in the paginated customer catalogue.");
   const plInactive = await req("GET", "/plans?includeInactive=1&pageSize=100");
   // includeInactive is ignored for customers — response must still exist, fine either way.
   assert.equal(plInactive.status, 200, P(plInactive));

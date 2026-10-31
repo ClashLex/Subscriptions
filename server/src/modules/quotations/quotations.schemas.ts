@@ -5,6 +5,7 @@ const templateItemSchema = z.object({
   variantId: z.number().int().positive().optional(),
   quantity: z.number().int().min(1).max(100000),
   taxId: z.number().int().positive().optional(),
+  isAddOn: z.boolean().optional(),
 });
 
 export const templateCreateSchema = z.object({

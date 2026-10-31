@@ -1,11 +1,12 @@
-/** Local API benchmark with 1,000 temporary finance records. Requires a running API and MySQL. */
+/** Local API benchmark with 3,000 temporary subscriptions and invoices. Requires a running API and MySQL. */
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import mysql from "mysql2/promise";
 
 if (process.env.NODE_ENV === "production") throw new Error("Performance fixtures are disabled in production.");
 
-const count = 1_000;
+const count = 3_000;
+const paidCount = count / 2;
 const prefix = `PF${Date.now().toString(36)}`;
 const today = new Date().toISOString().slice(0, 10);
 const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
@@ -89,7 +90,7 @@ try {
      VALUES ${invoices.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",")}`,
     invoices.flat(),
   );
-  const [invoiceRows] = await connection.query("SELECT id FROM invoices WHERE invoice_number LIKE ? ORDER BY id LIMIT 500", [`${prefix}I%`]);
+  const [invoiceRows] = await connection.query("SELECT id FROM invoices WHERE invoice_number LIKE ? ORDER BY id LIMIT ?", [`${prefix}I%`, paidCount]);
   const payments = invoiceRows.map((row) => [row.id, "test", "50.00", now, "SUCCESSFUL", userId]);
   await connection.query(
     `INSERT INTO payments (invoice_id, method, amount, paid_at, status, recorded_by)
@@ -103,10 +104,10 @@ try {
   assert.equal(after.activeSubscriptions - before.activeSubscriptions, count);
   const beforeInr = currency(before);
   const afterInr = currency(after);
-  for (const [field, expected] of [["invoiced", 10_000_000n], ["received", 2_500_000n], ["outstanding", 7_500_000n], ["overdue", 7_500_000n]]) {
+  for (const [field, expected] of [["invoiced", BigInt(count) * 10_000n], ["received", BigInt(paidCount) * 5_000n], ["outstanding", BigInt(count) * 10_000n - BigInt(paidCount) * 5_000n], ["overdue", BigInt(count) * 10_000n - BigInt(paidCount) * 5_000n]]) {
     assert.equal(cents(afterInr[field]) - cents(beforeInr[field]), expected, `${field} changed unexpectedly`);
   }
-  const paths = [summaryPath, "/invoices?page=1&pageSize=25", "/payments?page=1&pageSize=25"];
+  const paths = [summaryPath, "/subscriptions?page=1&pageSize=25", "/invoices?page=1&pageSize=25", "/payments?page=1&pageSize=25"];
   for (const path of paths) {
     const result = await measure(path, cookie);
     console.log(`${path}: p95=${result.p95.toFixed(1)}ms max=${result.max.toFixed(1)}ms with ${count} fixture invoices`);

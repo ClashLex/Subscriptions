@@ -1,6 +1,7 @@
 import { RowDataPacket, type PoolConnection, ResultSetHeader } from "mysql2/promise";
 import { AppError } from "../../middleware/errors.js";
-import { query, execute, withTransaction } from "../../config/db.js";import { addMoney, multiplyMoney, inclusiveTaxComponent, percentOf, toCents } from "../../lib/money.js";
+import { query, execute, withTransaction } from "../../config/db.js";
+import { addMoney, fromCents, multiplyMoney, inclusiveTaxComponent, percentOf, toCents } from "../../lib/money.js";
 import { todayIso, addDaysIso, parseUtc, mysqlUtc } from "../../lib/dates.js";
 import { getProductById, listVariantsForProduct } from "../products/products.service.js";
 import { getTaxById } from "../taxes/taxes.service.js";
@@ -44,6 +45,8 @@ export interface SubscriptionLineRow extends RowDataPacket {
   tax_rate_snapshot: string | null;
   tax_mode_snapshot: "EXCLUSIVE" | "INCLUSIVE" | null;
   line_amount: string;
+  is_add_on: 0 | 1;
+  is_enabled: 0 | 1;
 }
 
 export interface SubscriptionEventRow extends RowDataPacket {
@@ -117,6 +120,8 @@ function lineDto(line: SubscriptionLineRow) {
     taxName: line.tax_name_snapshot,
     taxRate: line.tax_rate_snapshot,
     taxMode: line.tax_mode_snapshot,
+    isAddOn: line.is_add_on === 1,
+    isEnabled: line.is_enabled === 1,
   };
 }
 
@@ -134,13 +139,13 @@ function eventDto(row: SubscriptionEventRow) {
 
 /**
  * Resolves line inputs against the catalogue and produces snapshot rows.
- * Unit price = variant effective price when a variant is referenced,
- * otherwise the product's sales price — except where an agreed price is
- * carried in (template items keep their snapshot price from template save).
- * Client-claimed prices on direct lines are ignored entirely.
+ * The first core line uses the plan's price plus any variant adjustment.
+ * Other lines use catalogue or stored template prices. Client-claimed prices
+ * on direct subscription lines are ignored.
  */
 async function resolveCatalogueLines(
   inputs: Array<SubscriptionLineInput & { unitPrice?: string }>,
+  planPrice: string,
 ): Promise<Array<{
   productId: number | null;
   variantId: number | null;
@@ -149,6 +154,7 @@ async function resolveCatalogueLines(
   unitPrice: string;
   taxId: number | null;
   lineAmount: string;
+  isAddOn: boolean;
 }>> {
   const productCache = new Map<number, { name: string; salesPrice: string }>();
   const resolved: Array<{
@@ -159,7 +165,9 @@ async function resolveCatalogueLines(
     unitPrice: string;
     taxId: number | null;
     lineAmount: string;
+    isAddOn: boolean;
   }> = [];
+  let primaryAssigned = false;
   for (const input of inputs) {
     let product = productCache.get(input.productId);
     if (product === undefined) {
@@ -178,6 +186,7 @@ async function resolveCatalogueLines(
     let variantId: number | null = null;
     let description = product.name;
     let unitPrice = product.salesPrice;
+    let variantAdjustment = "0.00";
     if (input.variantId !== undefined) {
       const variants = await listVariantsForProduct(input.productId);
       const variant = variants.find((row) => row.id === input.variantId);
@@ -189,10 +198,21 @@ async function resolveCatalogueLines(
       }
       variantId = variant.id;
       description = `${product.name} — ${variant.name}`;
+      variantAdjustment = variant.price_adjustment;
       unitPrice = input.unitPrice ?? addMoney(product.salesPrice, variant.price_adjustment);
     } else if (input.unitPrice !== undefined) {
       // Template-agreed price survives the catalogue changing underneath.
       unitPrice = input.unitPrice;
+    }
+    const isAddOn = input.isAddOn ?? false;
+    if (!isAddOn && !primaryAssigned) {
+      // The primary product carries the plan's recurring price. Optional
+      // add-ons keep catalogue or template prices.
+      unitPrice = addMoney(planPrice, variantAdjustment);
+      primaryAssigned = true;
+    }
+    if (toCents(unitPrice) < 0n) {
+      throw new AppError(400, "NEGATIVE_LINE_PRICE", "The plan price plus variant adjustment cannot be negative.");
     }
     let taxId: number | null = null;
     if (input.taxId !== undefined) {
@@ -210,7 +230,11 @@ async function resolveCatalogueLines(
       unitPrice,
       taxId,
       lineAmount: multiplyMoney(unitPrice, input.quantity),
+      isAddOn,
     });
+  }
+  if (!primaryAssigned) {
+    throw new AppError(400, "PRIMARY_LINE_REQUIRED", "A subscription needs one primary product line.");
   }
   return resolved;
 }
@@ -235,8 +259,8 @@ async function insertSubscriptionLines(
     await connection.execute(
       `INSERT INTO subscription_lines
        (subscription_id, product_id, variant_id, description_snapshot, quantity, unit_price,
-        tax_id, tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot, line_amount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        tax_id, tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot, line_amount, is_add_on, is_enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
       [
         subscriptionId,
         line.productId,
@@ -249,6 +273,7 @@ async function insertSubscriptionLines(
         taxSnapshot.rate,
         taxSnapshot.mode,
         line.lineAmount,
+        line.isAddOn,
       ],
     );
   }
@@ -320,7 +345,8 @@ async function insertSubscription(
 async function loadLines(subscriptionId: number): Promise<SubscriptionLineRow[]> {
   return query<SubscriptionLineRow[]>(
     `SELECT id, subscription_id, product_id, variant_id, description_snapshot, quantity,
-            unit_price, tax_id, tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot, line_amount
+            unit_price, tax_id, tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot, line_amount,
+            is_add_on, is_enabled
      FROM subscription_lines WHERE subscription_id = ? ORDER BY id`,
     [subscriptionId],
   );
@@ -352,7 +378,8 @@ async function loadLinesWith(
 ): Promise<SubscriptionLineRow[]> {
   const [rows] = await connection.execute(
     `SELECT id, subscription_id, product_id, variant_id, description_snapshot, quantity,
-            unit_price, tax_id, tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot, line_amount
+            unit_price, tax_id, tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot, line_amount,
+            is_add_on, is_enabled
      FROM subscription_lines WHERE subscription_id = ? ORDER BY id`,
     [subscriptionId],
   );
@@ -374,8 +401,8 @@ async function insertSnapshotLines(
     await connection.execute(
       `INSERT INTO subscription_lines
        (subscription_id, product_id, variant_id, description_snapshot, quantity, unit_price,
-        tax_id, tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot, line_amount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        tax_id, tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot, line_amount, is_add_on, is_enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         subscriptionId,
         line.product_id,
@@ -388,6 +415,8 @@ async function insertSnapshotLines(
         line.tax_rate_snapshot,
         line.tax_mode_snapshot,
         line.line_amount,
+        line.is_add_on,
+        line.is_enabled,
       ],
     );
   }
@@ -409,6 +438,7 @@ function cleanTotals(lines: SubscriptionLineRow[]): SubscriptionTotals {
   let taxTotal = 0n; // tax contained in the invoice (both modes)
   let exclusiveAdd = 0n; // only EXCLUSIVE taxes are added on top of the subtotal
   for (const line of lines) {
+    if (line.is_enabled === 0) continue;
     subtotal += toCents(line.line_amount);
     if (line.tax_rate_snapshot === null) {
       continue;
@@ -643,8 +673,9 @@ export async function createSubscription(
       quantity: number;
       unit_price: string;
       tax_id: number | null;
+      is_add_on: 0 | 1;
     }>>(
-      `SELECT product_id, variant_id, quantity, unit_price, tax_id
+      `SELECT product_id, variant_id, quantity, unit_price, tax_id, is_add_on
        FROM quotation_template_items WHERE template_id = ? ORDER BY id`,
       [dto.templateId],
     );
@@ -654,6 +685,7 @@ export async function createSubscription(
       quantity: item.quantity,
       unitPrice: item.unit_price,
       taxId: item.tax_id ?? undefined,
+      isAddOn: item.is_add_on === 1,
     }));
   } else if (dto.lines) {
     lineInputs = dto.lines;
@@ -661,9 +693,8 @@ export async function createSubscription(
     throw new AppError(400, "VALIDATION_ERROR", "Provide lines or a templateId.");
   }
 
-  // Snaplines from a template carry the unit price agreed when the template
-  // item was saved; direct lines always resolve the current catalogue price.
-  const lines = await resolveCatalogueLines(lineInputs);
+  // Template add-on prices retain their stored quote; the core line uses the plan.
+  const lines = await resolveCatalogueLines(lineInputs, plan.price);
   validateMinimumQuantity(plan, lines);
 
   try {
@@ -756,13 +787,27 @@ export async function updateSubscription(
 
     if (dto.lines !== undefined && dto.lines.length > 0) {
       validateMinimumQuantity(plan, dto.lines);
-      const lines = await resolveCatalogueLines(dto.lines);
+      const lines = await resolveCatalogueLines(dto.lines, plan.price);
       await connection.execute("DELETE FROM subscription_lines WHERE subscription_id = ?", [id]);
       await insertSubscriptionLines(connection, id, lines);
     } else {
       // The plan may change without new lines: the existing quantities must
       // still satisfy the new plan's minimum.
-      validateMinimumQuantity(plan, await loadLinesWith(connection, id));
+      const lines = await loadLinesWith(connection, id);
+      validateMinimumQuantity(plan, lines.filter((line) => line.is_enabled === 1));
+      if (dto.planId !== undefined && dto.planId !== subscription.plan_id) {
+        const previousPlan = await getPlanById(subscription.plan_id);
+        if (!previousPlan) throw new AppError(404, "PLAN_NOT_FOUND", "Previous plan no longer exists.");
+        const primary = lines.find((line) => line.is_add_on === 0);
+        if (!primary) throw new AppError(400, "PRIMARY_LINE_REQUIRED", "A subscription needs one primary product line.");
+        const revised = toCents(primary.unit_price) + toCents(plan.price) - toCents(previousPlan.price);
+        if (revised < 0n) throw new AppError(400, "NEGATIVE_LINE_PRICE", "The new plan price makes the primary line negative.");
+        const unitPrice = fromCents(revised);
+        await connection.execute(
+          "UPDATE subscription_lines SET unit_price = ?, line_amount = ? WHERE id = ?",
+          [unitPrice, multiplyMoney(unitPrice, primary.quantity), primary.id],
+        );
+      }
     }
 
     await recordEvent(
@@ -781,6 +826,42 @@ export async function updateSubscription(
     throw new AppError(500, "INTERNAL_ERROR", "Subscription update failed unexpectedly.");
   }
   return detail;
+}
+
+/** Switches an optional contract line for future invoices; past snapshots stay unchanged. */
+export async function setAddOnEnabled(
+  id: number,
+  lineId: number,
+  enabled: boolean,
+  actorId: number,
+  actorIsCustomer: boolean,
+): Promise<SubscriptionDetail> {
+  await withTransaction(async (connection) => {
+    const subscription = await lockSubscription(connection, id);
+    if (actorIsCustomer && subscription.customer_id !== actorId) {
+      throw new AppError(404, "NOT_FOUND", "Subscription not found.");
+    }
+    if (subscription.status !== "ACTIVE" && subscription.status !== "PAUSED") {
+      throw new AppError(409, "INVALID_TRANSITION", "Add-ons can be changed only on active or paused subscriptions.");
+    }
+    const lines = await loadLinesWith(connection, id);
+    const line = lines.find((candidate) => candidate.id === lineId);
+    if (!line || line.is_add_on !== 1) {
+      throw new AppError(404, "ADD_ON_NOT_FOUND", "Optional line not found on this subscription.");
+    }
+    if ((line.is_enabled === 1) === enabled) return;
+    const plan = await getPlanById(subscription.plan_id);
+    if (!plan) throw new AppError(404, "PLAN_NOT_FOUND", "The subscription's plan no longer exists.");
+    validateMinimumQuantity(plan, lines.filter((candidate) =>
+      candidate.id === lineId ? enabled : candidate.is_enabled === 1));
+    await connection.execute(
+      "UPDATE subscription_lines SET is_enabled = ? WHERE id = ? AND subscription_id = ?",
+      [enabled, lineId, id],
+    );
+    await recordEvent(connection, id, actorId, enabled ? "ADD_ON_ENABLED" : "ADD_ON_DISABLED",
+      subscription.status, subscription.status, `${line.description_snapshot} ${enabled ? "enabled" : "disabled"} for future invoices.`);
+  });
+  return (await getSubscriptionDetail(id)) as SubscriptionDetail;
 }
 
 // ---------------------------------------------------------------------------
@@ -992,7 +1073,7 @@ export async function closeSubscription(
       throw new AppError(404, "PLAN_NOT_FOUND", "The subscription's plan no longer exists.");
     }
     let override = false;
-    if (subscription.status === "ACTIVE" && !plan.allow_early_close) {
+    if (!plan.allow_early_close) {
       if (actorRole !== "ADMIN") {
         throw new AppError(
           409,
@@ -1042,10 +1123,17 @@ export async function renewSubscription(
     if (!plan.allow_renewal) {
       throw new AppError(409, "RENEWAL_NOT_ALLOWED", `Plan ${plan.name} does not allow renewal.`);
     }
+    const [existingRenewals] = await connection.execute(
+      "SELECT id FROM subscriptions WHERE previous_subscription_id = ? LIMIT 1",
+      [id],
+    );
+    if ((existingRenewals as Array<{ id: number }>).length > 0) {
+      throw new AppError(409, "ALREADY_RENEWED", "A renewal has already been requested for this subscription.");
+    }
     // Renewal continues the agreed lines verbatim, so a deleted catalogue
     // product or a price change cannot block or rewrite the new contract.
     const previousLines = await loadLinesWith(connection, id);
-    validateMinimumQuantity(plan, previousLines);
+    validateMinimumQuantity(plan, previousLines.filter((line) => line.is_enabled === 1));
     const newStart = addDaysIso(subscription.expiry_date ?? todayIso(), 1);
     const idOut = await insertSubscription(connection, {
       customerId: subscription.customer_id,

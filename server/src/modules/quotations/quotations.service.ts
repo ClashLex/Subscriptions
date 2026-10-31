@@ -23,6 +23,7 @@ export interface TemplateItemRow extends RowDataPacket {
   quantity: number;
   unit_price: string;
   tax_id: number | null;
+  is_add_on: 0 | 1;
 }
 
 export interface TemplateItemDto {
@@ -34,6 +35,7 @@ export interface TemplateItemDto {
   unitPrice: string;
   taxId: number | null;
   taxName: string | null;
+  isAddOn: boolean;
 }
 
 export interface TemplateDto {
@@ -110,6 +112,7 @@ async function resolveItemInputs(inputs: TemplateItemInput[]): Promise<TemplateI
       unitPrice,
       taxId,
       taxName,
+      isAddOn: input.isAddOn ?? false,
     });
   }
   return items;
@@ -125,7 +128,7 @@ async function loadDefaultPlanName(planId: number | null): Promise<string | null
 
 async function loadItems(templateId: number): Promise<TemplateItemDto[]> {
   const rows = await query<TemplateItemRow[]>(
-    `SELECT i.id, i.template_id, i.product_id, i.variant_id, i.quantity, i.unit_price, i.tax_id,
+    `SELECT i.id, i.template_id, i.product_id, i.variant_id, i.quantity, i.unit_price, i.tax_id, i.is_add_on,
             p.name AS product_name, v.name AS variant_name, t.name AS tax_name
      FROM quotation_template_items i
      JOIN products p ON p.id = i.product_id
@@ -143,6 +146,7 @@ async function loadItems(templateId: number): Promise<TemplateItemDto[]> {
     unitPrice: row.unit_price,
     taxId: row.tax_id,
     taxName: row.tax_name,
+    isAddOn: row.is_add_on === 1,
   }));
 }
 
@@ -203,9 +207,9 @@ export async function createTemplate(dto: TemplateCreateDto, createdBy: number):
       for (const item of items) {
         await connection.execute(
           `INSERT INTO quotation_template_items
-           (template_id, product_id, variant_id, quantity, unit_price, tax_id)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [templateId, item.productId, item.variantId, item.quantity, item.unitPrice, item.taxId],
+           (template_id, product_id, variant_id, quantity, unit_price, tax_id, is_add_on)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [templateId, item.productId, item.variantId, item.quantity, item.unitPrice, item.taxId, item.isAddOn],
         );
       }
       return templateId;
@@ -248,9 +252,9 @@ export async function updateTemplate(id: number, dto: TemplateUpdateDto): Promis
         await connection.execute("DELETE FROM quotation_template_items WHERE template_id = ?", [id]);
         for (const item of items) {
           await connection.execute(
-            `INSERT INTO quotation_template_items (template_id, product_id, variant_id, quantity, unit_price, tax_id)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [id, item.productId, item.variantId, item.quantity, item.unitPrice, item.taxId],
+            `INSERT INTO quotation_template_items (template_id, product_id, variant_id, quantity, unit_price, tax_id, is_add_on)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [id, item.productId, item.variantId, item.quantity, item.unitPrice, item.taxId, item.isAddOn],
           );
         }
       }

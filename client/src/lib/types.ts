@@ -58,7 +58,7 @@ export interface Plan {
   id: number;
   name: string;
   description: string | null;
-  price: string; // Catalogue reference price; invoices use subscription line prices.
+  price: string; // Recurring price for the subscription's primary line.
   billingIntervalUnit: BillingIntervalUnit;
   billingIntervalCount: number;
   minimumQuantity: number;
@@ -104,6 +104,7 @@ export interface TemplateItem {
   unitPrice: string;
   taxId: number | null;
   taxName: string | null;
+  isAddOn: boolean;
 }
 
 export interface QuotationTemplate {
@@ -149,6 +150,8 @@ export interface SubscriptionLine {
   taxName: string | null;
   taxRate: string | null;
   taxMode: "EXCLUSIVE" | "INCLUSIVE" | null;
+  isAddOn: boolean;
+  isEnabled: boolean;
 }
 
 export interface SubscriptionEvent {

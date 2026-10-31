@@ -26,6 +26,9 @@ test("admin and customer can follow an invoice through billing and payment", asy
     const product = await post<{ id: number }>(adminApi, "products", {
       name: `Browser item ${suffix}`, type: "Service", salesPrice: "100.00", costPrice: "0.00",
     });
+    const addOn = await post<{ id: number }>(adminApi, "products", {
+      name: `Browser add-on ${suffix}`, type: "Service", salesPrice: "10.00", costPrice: "0.00",
+    });
     const plan = await post<{ id: number }>(adminApi, "plans", {
       name: `Browser plan ${suffix}`, price: "999.00", billingIntervalUnit: "MONTH",
       billingIntervalCount: 1, minimumQuantity: 1, availableFrom: "2020-01-01", availableUntil: "2099-12-31",
@@ -33,7 +36,7 @@ test("admin and customer can follow an invoice through billing and payment", asy
     const today = new Date().toISOString().slice(0, 10);
     const subscription = await post<{ id: number }>(adminApi, "subscriptions", {
       customerId: customer.user.id, planId: plan.id, startDate: today,
-      lines: [{ productId: product.id, quantity: 1 }],
+      lines: [{ productId: product.id, quantity: 1 }, { productId: addOn.id, quantity: 1, isAddOn: true }],
     });
     for (const action of ["quotation", "confirm", "activate"]) {
       await post(adminApi, `subscriptions/${subscription.id}/${action}`, {});
@@ -56,7 +59,7 @@ test("admin and customer can follow an invoice through billing and payment", asy
     }
     await page.goto(`/admin/invoices?open=${invoiceId}`);
     await expect(page.getByRole("heading", { name: billed!.invoiceNumber })).toBeVisible();
-    await expect(page.getByText("₹80.00")).toBeVisible();
+    await expect(page.getByText("₹989.00")).toBeVisible();
     if (process.env.E2E_SMTP_CAPTURE === "1") {
       await page.getByRole("button", { name: "Email customer" }).click();
       await expect(page.getByText(`Invoice email sent to ${customerEmail}.`)).toBeVisible();
@@ -85,6 +88,15 @@ test("admin and customer can follow an invoice through billing and payment", asy
     await page.getByRole("button", { name: "payments", exact: true }).click();
     await expect(page.getByRole("heading", { name: "My payments" })).toBeVisible();
     await expect(page.getByText(`browser-${suffix}`)).toBeVisible();
+    await page.getByRole("button", { name: "subscriptions", exact: true }).click();
+    await page.getByRole("button", { name: "Manage" }).click();
+    await expect(page.getByText("Contract total before discounts: ₹1009.00")).toBeVisible();
+    await page.getByRole("button", { name: "Switch off" }).click();
+    await expect(page.getByText("Contract total before discounts: ₹999.00")).toBeVisible();
+    await page.getByRole("button", { name: "Pause", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+    await page.getByRole("button", { name: "Resume" }).click();
+    await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
 
     const staffEmail = `browser.staff.${suffix}@demo.test`;
     await post(adminApi, "users/staff", {

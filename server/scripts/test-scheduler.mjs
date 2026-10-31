@@ -101,7 +101,7 @@ try {
     return rows[0] ?? null;
   }, 80_000, "the scheduled invoice");
   assert.equal(invoice.actor_user_id, null, "Scheduled invoice event should have a system actor.");
-  assert.equal(invoice.grand_total, "100.00", "Scheduler should use the same line-based billing service.");
+  assert.equal(invoice.grand_total, "999.00", "Scheduler should bill the snapshotted plan-priced core line.");
   assert.match(childOutput, /automatic run: .*invoice\(s\)/, "Scheduler did not log its completed run.");
   console.log("The enabled scheduler created one invoice through the live API process, with a system audit event and line-based total.");
 } finally {

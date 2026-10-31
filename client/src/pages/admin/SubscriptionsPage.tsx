@@ -234,7 +234,7 @@ function SubscriptionCreator({
     startDate: todayIsoLocal(),
     expiryDate: "",
     paymentTermsDays: "0",
-    items: [{ productId: null, variantId: null, quantity: "1", taxId: null }],
+    items: [{ productId: null, variantId: null, quantity: "1", taxId: null, isAddOn: false }],
   });
   const [plans, setPlans] = useState<Plan[]>([]);
   const [templates, setTemplates] = useState<QuotationTemplate[]>([]);
@@ -284,6 +284,7 @@ function SubscriptionCreator({
           variantId: row.variantId ?? undefined,
           quantity: Math.max(Number.parseInt(row.quantity, 10) || 1, 1),
           taxId: row.taxId ?? undefined,
+          isAddOn: row.isAddOn,
         }));
       if (lines.length === 0) {
         setError(asApiError(new Error("Add at least one line or choose a template.")));
@@ -344,12 +345,12 @@ function SubscriptionCreator({
               <option value="">Choose a plan…</option>
               {plans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
-                  {plan.name} — reference {formatMoney(plan.price)} / {intervalLabel(plan.billingIntervalUnit, plan.billingIntervalCount)}
+                  {plan.name} — {formatMoney(plan.price)} / {intervalLabel(plan.billingIntervalUnit, plan.billingIntervalCount)}
                 </option>
               ))}
             </Select>
           </Field>
-          <p className="text-xs text-slate-500">Recurring invoices use the subscription line prices, with eligible discounts and taxes.</p>
+          <p className="text-xs text-slate-500">The first core line uses the plan price. Optional add-ons use catalogue prices; discounts and taxes apply on invoices.</p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label="Start date (today if blank)">
@@ -571,19 +572,19 @@ function SubscriptionDetailModal({
                   <th className="px-3 py-1.5">Qty</th>
                   <th className="px-3 py-1.5">Unit</th>
                   <th className="px-3 py-1.5">Tax</th>
-                  <th className="px-3 py-1.5 text-right">Amount</th>
+                  <th className="px-3 py-1.5 text-right">Amount / add-on</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {detail.lines.map((line) => (
                   <tr key={line.id}>
-                    <td className="px-3 py-1.5">{line.description}</td>
+                    <td className="px-3 py-1.5">{line.description} {line.isAddOn ? <Badge tone={line.isEnabled ? "indigo" : "slate"}>{line.isEnabled ? "On" : "Off"}</Badge> : null}</td>
                     <td className="px-3 py-1.5">{line.quantity}</td>
                     <td className="px-3 py-1.5">{formatMoney(line.unitPrice)}</td>
                     <td className="px-3 py-1.5 text-xs text-slate-500">
                       {line.taxName === null ? "—" : `${line.taxName} ${line.taxRate}% (${line.taxMode?.toLowerCase()})`}
                     </td>
-                    <td className="px-3 py-1.5 text-right">{formatMoney(line.lineAmount)}</td>
+                    <td className="px-3 py-1.5 text-right">{formatMoney(line.lineAmount)}{line.isAddOn && (detail.status === "ACTIVE" || detail.status === "PAUSED") ? <div><Button variant="secondary" disabled={busy} onClick={() => void act(`add-ons/${line.id}`, { enabled: !line.isEnabled }, "PATCH")}>{line.isEnabled ? "Switch off" : "Switch on"}</Button></div> : null}</td>
                   </tr>
                 ))}
               </tbody>

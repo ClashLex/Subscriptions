@@ -10,14 +10,14 @@ The application is under active development. The table separates features availa
 
 | Area | Available now |
 |---|---|
-| Browser | Sign in, customer registration and password reset; Admin and Staff catalogue, tax, plan, quotation template, subscription, invoice, payment, and discount screens; finance overview; customer subscription, invoice, and payment views; printable invoices. |
+| Browser | Sign in, customer registration and password reset; Admin and Staff catalogue, tax, plan, quotation template, subscription, invoice, payment, and discount screens; finance overview; customer subscription and optional add-on management, invoice, and payment views; printable invoices. |
 | API | Authentication and roles; customer directory; catalogue and plans; quotation and subscription lifecycle; discount rules; recurring invoice generation; invoice reads, confirmation, cancellation, and email delivery; payment recording and reads; finance summary. |
 | Billing trigger | Admin-only **Run billing** control on the invoice screen, `POST /api/v1/billing/run`, or an optional in-process scheduler. The scheduler is disabled by default. |
-| Remaining work | Verify a real hosted deployment and external SMTP provider when available; add a PDF email attachment only if the submission requires one. |
+| Remaining work | Verify a real hosted deployment and external SMTP provider when available. |
 
 The main workflow is: configure a product and plan, create a customer subscription, submit and confirm its quotation, activate it, run billing when due, confirm the invoice, and record payments. Admins run billing from **Invoices & billing**. Admins and Staff can review invoices, confirm or cancel eligible invoices, record payments, search payment history, print or save an invoice as a PDF through the browser, and email a confirmed or paid invoice link when SMTP is configured. The **Overview** shows dated invoiced and received amounts plus current outstanding and overdue balances. Admins create, edit, activate, and deactivate discount rules; Staff can read active rules.
 
-**Pricing rule:** a plan's `price` is a catalogue reference amount. Recurring invoice amounts come from the subscription's snapshotted product lines, followed by eligible discounts and taxes. The plan price does not add a fee or replace line prices. The plan and subscription screens label it as a reference price.
+**Pricing rule:** the plan sets the recurring unit price for the subscription's first core product line. Its variant adjustment is added to that price. Other core lines and optional add-ons use catalogue or stored template prices. The agreed line prices are snapshotted on the subscription; later plan or catalogue edits do not rewrite an active contract or an issued invoice. Customers can switch optional add-ons on or off for future billing periods. Eligible discounts and taxes are applied when an invoice is generated. Existing contracts created before migration 009 keep their agreed line prices.
 
 ## Technology
 
@@ -64,7 +64,7 @@ npm.cmd run migrate
 npm.cmd run seed
 ```
 
-`migrate` applies pending files in `server/migrations/` and records them in `schema_migrations`. Migration 008 stores each subscription's billing anniversary day so a monthly contract beginning on January 31 bills on February 28 (or 29) and then returns to March 31; yearly February 29 contracts return to that date in leap years. `seed` creates or updates the Admin account from `.env`; it does not create a full demo dataset.
+`migrate` applies pending files in `server/migrations/` and records them in `schema_migrations`. Migration 008 stores the billing anniversary day. Migration 009 marks optional subscription and template lines and stores whether each subscription add-on is enabled. Existing lines remain enabled. `seed` creates or updates the Admin account from `.env`; it does not create a full demo dataset.
 
 ### 3. Start the API and browser
 
@@ -92,7 +92,7 @@ For a compiled API run, execute `npm.cmd run build` and then `npm.cmd run start`
 |---|---|
 | Admin | Configure products, variants, taxes, and plans; manage users; run billing; manage subscriptions and finance records; view the finance overview. |
 | Staff | Read catalogue configuration and active discounts; create and edit quotation templates and subscriptions; review, confirm, or cancel eligible invoices, email issued invoice links, record payments, and view the finance overview. |
-| Customer | Register and sign in; see their own subscriptions, issued invoices, invoice detail, and recorded payments in the portal; print or save their invoices as PDF. |
+| Customer | Register and sign in; see their own subscriptions, switch optional add-ons, pause, resume, close, or request renewal when the plan permits; view issued invoices and payments; print or save invoices as PDF. |
 
 Subscriptions follow **Draft → Quotation → Confirmed → Active**. Active subscriptions may be paused, resumed, closed, or renewed according to plan policy. Invoice generation snapshots line prices, tax, and any eligible discount. A unique database key prevents duplicate invoices for the same subscription period. Payments can cover part or all of a confirmed invoice; overpayments are rejected.
 
@@ -102,19 +102,19 @@ Monthly and yearly billing keeps the contract's anniversary day when a shorter m
 
 ### Billing in the browser
 
-1. Sign in as Admin. In **Plans**, set the billing interval and a reference price. In **Products & variants**, set sale prices. Create a quotation template or add priced product lines when creating a subscription.
-2. In **Subscriptions**, complete the quotation and activate the subscription. Its line prices are the recurring billing basis.
+1. Sign in as Admin. In **Plans**, set the billing interval and recurring price. In **Products & variants**, set sale prices and variant adjustments. Create a quotation template or product lines for the subscription; mark optional lines as **Add-on**. Keep at least one core line.
+2. In **Subscriptions**, complete the quotation and activate the subscription. The first core line uses the plan price plus its variant adjustment. Add-ons use their catalogue or template price. The resulting agreed line prices are the recurring billing basis.
 3. Optionally create a rule in **Discounts**. Choose a fixed amount or percentage, a whole subscription or selected products, and any minimums, date window, or usage limit. Only Admins can change rules.
 4. When an active subscription is due, open **Invoices & billing** and select **Run billing** as Admin. The screen reports how many subscriptions were scanned, invoiced, skipped, closed, or failed. Billing also runs automatically if the optional scheduler is enabled.
 5. Filter and open an invoice to review its line, discount, tax, total, payment, and outstanding-balance snapshots. Confirm a draft invoice before collecting payment or emailing it. Eligible draft or unpaid confirmed invoices can be cancelled. Select **Print / save PDF** to use the browser's print dialog; **Email customer** sends a link to the customer's own portal invoice when SMTP is configured.
-6. Record a partial or full payment on a confirmed invoice. Use **Payments** for history and a link back to the invoice. The server rejects overpayments and updates the invoice to paid when its balance reaches zero. Customers see invoices that were confirmed and their payment history in **My portal**; draft invoices, including those cancelled before confirmation, stay hidden from them.
+6. Record a partial or full payment on a confirmed invoice. Use **Payments** for history and a link back to the invoice. The server rejects overpayments and updates the invoice to paid when its balance reaches zero. Customers see invoices that were confirmed and their payment history in **My portal**; draft invoices, including those cancelled before confirmation, stay hidden from them. In **My subscriptions**, customers can manage their own add-ons and permitted lifecycle actions. Switching an add-on affects the next invoice and leaves older invoices unchanged. A renewal request creates a linked draft for the team to confirm and activate.
 7. Use **Overview** to choose an issue/payment date range. Invoiced totals include confirmed and paid invoices issued in that range; cash received includes successful payments in that range. Outstanding and overdue are current balances across all confirmed or paid invoices, and active subscriptions are a current count. Money is grouped by currency rather than summed across currencies.
 
 Billing is repeat-safe for an already invoiced subscription period. The browser's **Run billing** button affects every currently due subscription, so review the reported failures and server log after a run.
 
 Password reset uses SMTP when configured. In local development without SMTP, the reset link is logged by the server and returned to the browser as a development link. In production without SMTP, the API does not log or return the reset token.
 
-Invoice email requires `SMTP_HOST` and a suitable `MAIL_FROM` in `.env`. Without SMTP, the **Email customer** action returns an error and does not log invoice data. It sends a portal link, without a PDF attachment. Customers must sign in to open the link; the API checks invoice ownership. The SMTP capture test verifies message content locally; delivery through a real external provider still needs checking with the deployment credentials.
+Invoice email requires `SMTP_HOST` and a suitable `MAIL_FROM` in `.env`. Without SMTP, the **Email customer** action returns an error and does not log invoice data. It sends a portal link, without a PDF attachment. Customers must sign in to open the link; the API checks invoice ownership. Local SMTP capture checks verify both invoice and password reset messages. Delivery through an external provider still needs checking with deployment credentials.
 
 ### Prepare local demo records
 
@@ -135,7 +135,7 @@ npm.cmd run test:concurrency
 npm.cmd run test:scheduler
 ```
 
-The API acceptance scripts create test records in the configured database, so use a local test or demo database. `test:concurrency` runs overlapping billing and payment requests and checks invoice/payment rows in MySQL. `test:scheduler` starts a separate API with a one-minute billing interval and waits for its invoice and system audit event. `test:finance:unit`, `test:billing:unit`, and `test:email:unit` run without a database after building the server. The email checks capture one message in a local SMTP server and ensure production does not expose reset tokens without SMTP. The billing unit check covers interval date math; the live billing suite covers daily billing and repeated monthly/yearly periods.
+The API acceptance scripts create test records in the configured database, so use a local test or demo database. `test:subscriptions` covers customer ownership, plan pricing, add-on controls, and lifecycle policy. `test:billing` verifies that switching off an add-on removes it from the next invoice while the previous invoice remains unchanged. `test:concurrency` runs overlapping billing and payment requests and checks invoice/payment rows in MySQL. `test:scheduler` starts a separate API with a one-minute billing interval and waits for its invoice and system audit event. `test:finance:unit`, `test:billing:unit`, and `test:email:unit` run without a database after building the server. The email checks capture invoice and reset messages in a local SMTP server and ensure production does not expose reset tokens without SMTP.
 
 The checks below do not require the running API:
 
@@ -153,9 +153,9 @@ npm.cmd run lint
 npm.cmd run build
 ```
 
-For the browser workflow check, keep the API and Vite running and install Microsoft Edge on the test machine. From `client/`, run `npm.cmd run test:e2e`. This Playwright check exercises Admin, Customer, and Staff views, including a rendered invoice PDF. It creates test records in the local database. Run `npm.cmd run test:performance` from `server/` to measure finance summary and list responses with 1,000 temporary records; the script deletes its fixture after the run. These are local checks, not production load results.
+For the browser workflow check, keep the API and Vite running and install Microsoft Edge on the test machine. From `client/`, run `npm.cmd run test:e2e`. This Playwright check exercises Admin, Customer, and Staff views, customer add-on and pause controls, and a rendered invoice PDF. It creates test records in the local database. Run `npm.cmd run test:performance` from `server/` to measure finance summary and paginated subscription, invoice, and payment lists with 3,000 temporary subscriptions and invoices; the script deletes its fixture after the run. These are local checks, not production load results.
 
-To check a production-like setup locally, run `npm.cmd run test:deployment` from `server/`. It requires OpenSSL (or `OPENSSL_BIN`), Microsoft Edge, MySQL, and the installed dependencies. The script builds both apps, checks migration 008, starts a production-mode API and browser bundle behind a temporary HTTPS reverse proxy, then tests health, CORS, Secure session cookies, browser billing, PDF output, and invoice delivery to a local SMTP capture server. It removes the temporary certificate after the run. No hosted environment or external SMTP provider is configured here, so this check does not establish their behaviour.
+To check a production-like setup locally, run `npm.cmd run test:deployment` from `server/`. It requires OpenSSL (or `OPENSSL_BIN`), Microsoft Edge, MySQL, and the installed dependencies. The script builds both apps, checks migrations 008 and 009, starts a production-mode API and browser bundle behind a temporary HTTPS reverse proxy, then tests health, CORS, Secure session cookies, browser billing and customer controls, PDF output, and invoice delivery to a local SMTP capture server. It removes the temporary certificate after the run. No hosted environment or external SMTP provider is configured here, so this check does not establish their behaviour.
 
 The [changelog](docs/CHANGELOG.md) records verification evidence and remaining gaps. Live API acceptance scripts need a running MySQL server and API.
 

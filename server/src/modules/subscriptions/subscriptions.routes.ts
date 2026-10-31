@@ -1,9 +1,10 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { z } from "zod";
 import { AppError, asyncHandler } from "../../middleware/errors.js";
 import { requireAuth, requireStaffOrAdmin } from "../auth/auth.middleware.js";
 import {
   quotationSubmitSchema,
+  addOnToggleSchema,
   reasonSchema,
   subscriptionCreateSchema,
   subscriptionListQuerySchema,
@@ -19,6 +20,7 @@ import {
   pauseSubscription,
   renewSubscription,
   resumeSubscription,
+  setAddOnEnabled,
   submitQuotation,
   updateSubscription,
 } from "./subscriptions.service.js";
@@ -36,6 +38,14 @@ function sessionRole(role: string | undefined): "ADMIN" | "STAFF" | "CUSTOMER" {
     return role;
   }
   throw new AppError(401, "UNAUTHENTICATED", "Sign in to continue.");
+}
+
+async function requireOwnerIfCustomer(req: Request, id: number): Promise<void> {
+  if (sessionRole(req.session.role) !== "CUSTOMER") return;
+  const detail = await getSubscriptionDetail(id);
+  if (!detail || detail.customerId !== req.session.userId) {
+    throw new AppError(404, "NOT_FOUND", "Subscription not found.");
+  }
 }
 
 /** The listing honours the same pagination contract across the catalogue. */
@@ -136,9 +146,9 @@ subscriptionsRouter.post(
 /** Active → Paused (only when the plan allows pause). */
 subscriptionsRouter.post(
   "/:id/pause",
-  requireStaffOrAdmin,
   asyncHandler(async (req, res) => {
     const id = idParam.parse(req.params.id);
+    await requireOwnerIfCustomer(req, id);
     const options = reasonSchema.parse(req.body);
     const detail = await pauseSubscription(id, req.session.userId as number, options);
     res.status(200).json({ data: detail });
@@ -148,9 +158,9 @@ subscriptionsRouter.post(
 /** Paused → Active: shifts next billing by the paused duration. */
 subscriptionsRouter.post(
   "/:id/resume",
-  requireStaffOrAdmin,
   asyncHandler(async (req, res) => {
     const id = idParam.parse(req.params.id);
+    await requireOwnerIfCustomer(req, id);
     const options = reasonSchema.parse(req.body);
     const detail = await resumeSubscription(id, req.session.userId as number, options);
     res.status(200).json({ data: detail });
@@ -160,9 +170,9 @@ subscriptionsRouter.post(
 /** Active/Paused → Closed: plan early-close rules with an Admin override. */
 subscriptionsRouter.post(
   "/:id/close",
-  requireStaffOrAdmin,
   asyncHandler(async (req, res) => {
     const id = idParam.parse(req.params.id);
+    await requireOwnerIfCustomer(req, id);
     const options = reasonSchema.parse(req.body);
     const detail = await closeSubscription(
       id,
@@ -177,11 +187,23 @@ subscriptionsRouter.post(
 /** Active/Closed → new linked draft when the plan allows renewal. */
 subscriptionsRouter.post(
   "/:id/renew",
-  requireStaffOrAdmin,
   asyncHandler(async (req, res) => {
     const id = idParam.parse(req.params.id);
+    await requireOwnerIfCustomer(req, id);
     const options = reasonSchema.parse(req.body);
     const detail = await renewSubscription(id, req.session.userId as number, options);
     res.status(201).json({ data: detail });
+  }),
+);
+
+subscriptionsRouter.patch(
+  "/:id/add-ons/:lineId",
+  asyncHandler(async (req, res) => {
+    const id = idParam.parse(req.params.id);
+    const lineId = idParam.parse(req.params.lineId);
+    const { enabled } = addOnToggleSchema.parse(req.body);
+    const detail = await setAddOnEnabled(id, lineId, enabled, req.session.userId as number,
+      sessionRole(req.session.role) === "CUSTOMER");
+    res.status(200).json({ data: detail });
   }),
 );

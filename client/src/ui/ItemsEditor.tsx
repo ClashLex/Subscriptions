@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { asApiError, formatMoney, list, request, type ApiError } from "../lib/api.js";
 import type { Product, ProductVariant, ProductWithVariants } from "../lib/types.js";
-import { Badge, Button, Select, TextInput } from "./components.js";
+import { Badge, Button, Checkbox, Select, TextInput } from "./components.js";
 
 export interface ItemRow {
   productId: number | null;
   variantId: number | null;
   quantity: string;
   taxId: number | null;
+  isAddOn: boolean;
 }
 
 /**
@@ -88,16 +89,18 @@ export function ItemsEditor({
       {products === null ? (
         <p className="text-sm text-slate-500">{"Loading catalogue\u2026"}</p>
       ) : (
-        <div className="space-y-2">
-          <div className="grid grid-cols-[1fr_1fr_5rem_1fr_2rem] gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className="space-y-2 overflow-x-auto">
+          <div className="min-w-[42rem] space-y-2">
+          <div className="grid grid-cols-[1fr_1fr_5rem_1fr_7rem_2rem] gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <span>Product</span>
             <span>Variant</span>
             <span>Qty</span>
             <span>Tax</span>
+            <span>Optional add-on</span>
             <span />
           </div>
           {derivedRows.map(({ row, variants }, index) => (
-            <div key={index} className="grid grid-cols-[1fr_1fr_5rem_1fr_2rem] items-center gap-2">
+            <div key={index} className="grid grid-cols-[1fr_1fr_5rem_1fr_7rem_2rem] items-center gap-2">
               <Select
                 value={row.productId ?? ""}
                 onChange={(event) => handleProductChange(index, event.target.value)}
@@ -141,6 +144,7 @@ export function ItemsEditor({
                   </option>
                 ))}
               </Select>
+              <Checkbox label="Add-on" checked={row.isAddOn} onChange={(checked) => updateRow(index, { isAddOn: checked })} />
               <Button
                 type="button"
                 variant="danger"
@@ -151,17 +155,16 @@ export function ItemsEditor({
               </Button>
             </div>
           ))}
+          </div>
           <Button
             type="button"
             variant="secondary"
-            onClick={() => onRowsChange([...rows, { productId: null, variantId: null, quantity: "1", taxId: null }])}
+            onClick={() => onRowsChange([...rows, { productId: null, variantId: null, quantity: "1", taxId: null, isAddOn: false }])}
           >
             + Add line
           </Button>
           <p className="text-xs text-slate-500">
-            Quantities count as exact units; eligible-badge products only. Prices are resolved by the server
-            from the catalogue snapshots —{" "}
-            <Badge tone="slate">never from this form</Badge>.
+            The first core line uses the plan price; variants add their adjustment. Optional add-ons use catalogue prices and customers may switch them for future invoices. Prices are resolved by the server <Badge tone="slate">never from this form</Badge>.
           </p>
         </div>
       )}

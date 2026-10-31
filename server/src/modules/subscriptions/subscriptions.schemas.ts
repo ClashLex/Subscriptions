@@ -6,6 +6,7 @@ const lineSchema = z.object({
   variantId: z.number().int().positive().optional(),
   quantity: z.number().int().min(1).max(100000),
   taxId: z.number().int().positive().optional(),
+  isAddOn: z.boolean().optional(),
   /** Only honoured when a template is not the source: omitted → catalogue price. */
 });
 
@@ -41,6 +42,8 @@ export const subscriptionUpdateSchema = z.object({
 export const reasonSchema = z.object({
   reason: z.string().trim().max(500).optional(),
 });
+
+export const addOnToggleSchema = z.object({ enabled: z.boolean() });
 
 export const quotationSubmitSchema = z.object({
   validityDays: z.number().int().min(1).max(365).optional(),

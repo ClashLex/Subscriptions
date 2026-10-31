@@ -512,7 +512,7 @@ async function loadSubscriptionLines(connection: PoolConnection, subscriptionId:
   const [lines] = await connection.execute(
     `SELECT id, product_id, variant_id, description_snapshot, quantity, unit_price,
             tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot
-     FROM subscription_lines WHERE subscription_id = ? ORDER BY id`,
+     FROM subscription_lines WHERE subscription_id = ? AND is_enabled = TRUE ORDER BY id`,
     [subscriptionId],
   );
   return lines as Array<RowDataPacket & SubscriptionLineRow>;
