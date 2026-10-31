@@ -142,4 +142,4 @@ The latest local pre-push review passed these static checks. The live API suites
 
 ## Documentation in Git
 
-Git tracks this README and [docs/CHANGELOG.md](docs/CHANGELOG.md). All other Markdown files under `docs/` are ignored and remain in local working copies only. They are absent from a fresh clone and the current GitHub file tree, though earlier commits still contain them. This README contains the setup and current feature status needed to use the repository without those local files.
+Git tracks this README and [docs/CHANGELOG.md](docs/CHANGELOG.md).
