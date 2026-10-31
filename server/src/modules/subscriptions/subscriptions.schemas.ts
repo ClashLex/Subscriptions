@@ -15,6 +15,8 @@ export const subscriptionCreateSchema = z
     planId: z.number().int().positive(),
     templateId: z.number().int().positive().optional(),
     startDate: isoDateSchema.optional(),
+    /** Contract end; omitted means open-ended and billed every interval. */
+    expiryDate: isoDateSchema.nullable().optional(),
     paymentTermsDays: z.number().int().min(0).max(120).optional(),
     lines: z.array(lineSchema).min(1).max(50).optional(),
   })
@@ -30,6 +32,7 @@ export const subscriptionCreateSchema = z
 
 export const subscriptionUpdateSchema = z.object({
   startDate: isoDateSchema.optional(),
+  expiryDate: isoDateSchema.nullable().optional(),
   paymentTermsDays: z.number().int().min(0).max(120).optional(),
   planId: z.number().int().positive().optional(),
   lines: z.array(lineSchema).min(1).max(50).optional(),

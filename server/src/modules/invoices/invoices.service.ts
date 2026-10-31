@@ -369,7 +369,14 @@ export async function recordPayment(
   dto: PaymentCreateDto,
   actorId: number,
 ): Promise<InvoiceDto> {
-  const paidAt = dto.paidAt ? mysqlUtc(parseUtc(dto.paidAt.replace(" ", "T"))) : mysqlUtc(new Date());
+  let paidAt = mysqlUtc(new Date());
+  if (dto.paidAt !== undefined) {
+    const parsedPaidAt = parseUtc(dto.paidAt);
+    if (Number.isNaN(parsedPaidAt.getTime())) {
+      throw new AppError(400, "INVALID_PAID_AT", "paidAt is not a valid date or time.");
+    }
+    paidAt = mysqlUtc(parsedPaidAt);
+  }
   await withTransaction(async (connection) => {
     const [rows] = await connection.execute(
       "SELECT id, status, grand_total FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE",

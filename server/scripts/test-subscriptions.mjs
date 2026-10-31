@@ -235,7 +235,9 @@ await step("submit quotation → QUOTATION with validity window", async () => {
   assert.equal(s1?.status, "QUOTATION");
   const expected = new Date();
   expected.setDate(expected.getDate() + 15);
-  assert.equal(s1?.expiryDate, expected.toISOString().slice(0, 10));
+  // Quotation validity has its own field; the contract end stays untouched.
+  assert.equal(s1?.quotationValidUntil, expected.toISOString().slice(0, 10));
+  assert.equal(s1?.expiryDate, null);
 });
 
 await step("patch start date while quotation", async () => {
@@ -258,7 +260,9 @@ await step("activate → ACTIVE with next_billing_at and contract end", async ()
   s1 = r.json?.data;
   assert.equal(s1?.status, "ACTIVE");
   assert.equal(s1?.nextBillingAt?.slice(0, 10), START_TODAY);
-  assert.notEqual(s1?.expiryDate, null);
+  // No contract end was agreed, so activation must not invent one: an
+  // open-ended contract keeps billing every interval.
+  assert.equal(s1?.expiryDate, null);
   const events = s1?.events?.map((e) => e.eventType) ?? [];
   assert.ok(events.includes("SUBMITTED_QUOTATION"));
   assert.ok(events.includes("CONFIRMED"));
@@ -326,12 +330,18 @@ await step("admin close override on non-early-closable plan → CLOSED", async (
 });
 
 await step("renewal creates a linked draft and preserves history", async () => {
+  // Change the catalogue again: the renewal must keep the agreed snapshot.
+  const reprice = await req("PATCH", `/products/${productId}`, { body: { salesPrice: "999.00" } });
+  assert.equal(reprice.status, 200, P(reprice));
   const r = await req("POST", `/subscriptions/${s2.id}/renew`, { body: {} });
   assert.equal(r.status, 201, P(r));
   const renewed = r.json?.data;
   assert.equal(renewed?.status, "DRAFT");
   assert.equal(renewed?.previousSubscriptionId, s2.id);
   assert.equal(renewed?.customerId, s2.customerId);
+  // Renewal copies the agreed snapshot instead of re-resolving the catalogue.
+  assert.equal(renewed?.lines?.[0]?.unitPrice, s2.lines?.[0]?.unitPrice);
+  assert.equal(renewed?.lines?.[0]?.unitPrice, "150.00");
   const old = await req("GET", `/subscriptions/${s2.id}`);
   assert.equal(old.json?.data?.status, "CLOSED");
 });
@@ -364,8 +374,46 @@ await step("template-driven subscription copies items and uses template validity
   assert.equal(submit.status, 200, P(submit));
   const expected = new Date();
   expected.setDate(expected.getDate() + 10);
-  assert.equal(submit.json?.data?.expiryDate, expected.toISOString().slice(0, 10));
+  assert.equal(submit.json?.data?.quotationValidUntil, expected.toISOString().slice(0, 10));
   sTemplate = submit.json?.data;
+});
+
+await step("explicit contract end survives activation; invalid term rejected", async () => {
+  const end = new Date();
+  end.setDate(end.getDate() + 60);
+  const contractEnd = end.toISOString().slice(0, 10);
+  const created = await req("POST", "/subscriptions", {
+    body: {
+      customerId: customer1Id,
+      planId: planA,
+      startDate: START_TODAY,
+      expiryDate: contractEnd,
+      lines: [{ productId, quantity: 1 }],
+    },
+  });
+  assert.equal(created.status, 201, P(created));
+  assert.equal(created.json?.data?.expiryDate, contractEnd);
+  const id = created.json?.data?.id;
+  for (const path of ["quotation", "confirm", "activate"]) {
+    const r = await req("POST", `/subscriptions/${id}/${path}`, { body: {} });
+    assert.equal(r.status, 200, P(r));
+  }
+  const detail = await req("GET", `/subscriptions/${id}`);
+  assert.equal(detail.json?.data?.expiryDate, contractEnd);
+  assert.equal(detail.json?.data?.status, "ACTIVE");
+
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const invalid = await req("POST", "/subscriptions", {
+    body: {
+      customerId: customer1Id,
+      planId: planA,
+      startDate: START_TODAY,
+      expiryDate: yesterday,
+      lines: [{ productId, quantity: 1 }],
+    },
+  });
+  assert.equal(invalid.status, 400, P(invalid));
+  assert.equal(invalid.json?.error?.code, "INVALID_CONTRACT_END");
 });
 
 await step("staff lifecycle: create allowed, close blocked by plan", async () => {
@@ -454,6 +502,19 @@ await step("update frozen after confirmation → 409", async () => {
   const r = await req("PATCH", `/subscriptions/${s1.id}`, { body: { paymentTermsDays: 30 } });
   assert.equal(r.status, 409, P(r));
   assert.equal(r.json?.error?.code, "INVALID_TRANSITION");
+});
+
+await step("concurrent close requests cannot both succeed", async () => {
+  jar.clear();
+  assert.equal((await req("POST", "/auth/login", { body: admin })).status, 200);
+  const [first, second] = await Promise.all([
+    req("POST", `/subscriptions/${s3.id}/close`, { body: {} }),
+    req("POST", `/subscriptions/${s3.id}/close`, { body: {} }),
+  ]);
+  const statuses = [first.status, second.status].sort((a, b) => a - b);
+  assert.deepEqual(statuses, [200, 409], P({ first, second }));
+  const rejected = first.status === 409 ? first : second;
+  assert.equal(rejected.json?.error?.code, "INVALID_TRANSITION", P(rejected));
 });
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);

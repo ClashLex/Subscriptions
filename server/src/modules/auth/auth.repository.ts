@@ -86,20 +86,37 @@ export async function createPasswordResetToken(
 }
 
 /**
- * Deletes every stored session whose JSON payload belongs to this user.
+ * Deletes every stored session whose payload belongs to this user.
  * Used after password resets and account deactivation so invalidated users
  * cannot keep using an old cookie (SECURITY_AND_ACCESS.md §3, §4).
+ *
+ * The user id is read from the parsed session payload rather than matched with
+ * a LIKE pattern, so the revocation does not depend on express-session's JSON
+ * key order or formatting.
  */
 export async function revokeUserSessionsWithConnection(
   connection: PoolConnection,
   userId: number,
 ): Promise<void> {
-  const pattern = `%"userId":${userId},%`;
-  const patternEnd = `%"userId":${userId}}%`;
-  await connection.execute("DELETE FROM sessions WHERE data LIKE ? OR data LIKE ?", [
-    pattern,
-    patternEnd,
-  ]);
+  const [rows] = await connection.query("SELECT session_id, data FROM sessions");
+  const sessionIds: string[] = [];
+  for (const row of rows as Array<RowDataPacket & { session_id: string; data: string }>) {
+    try {
+      const payload = JSON.parse(String(row.data)) as { userId?: unknown };
+      if (Number(payload.userId) === userId) {
+        sessionIds.push(String(row.session_id));
+      }
+    } catch {
+      // A malformed or foreign session row simply does not match.
+    }
+  }
+  for (let start = 0; start < sessionIds.length; start += 100) {
+    const chunk = sessionIds.slice(start, start + 100);
+    await connection.execute(
+      `DELETE FROM sessions WHERE session_id IN (${chunk.map(() => "?").join(",")})`,
+      chunk,
+    );
+  }
 }
 
 export interface ResetTokenRow extends RowDataPacket {

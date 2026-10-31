@@ -64,6 +64,7 @@ let subscriptionId;
 let tinySubscriptionId;
 let invoiceId;
 let tinyInvoiceId;
+let recurringId;
 
 await step("anonymous billing trigger is rejected", async () => {
   jar.clear();
@@ -246,6 +247,73 @@ await step("invoice confirmation, partial payment, overpayment rejection, and pa
   const ownInvoice = await req("GET", `/invoices/${invoiceId}`);
   assert.equal(ownInvoice.status, 200, show(ownInvoice));
   assert.equal(ownInvoice.json?.data?.customerId, customerId);
+});
+
+await step("open-ended contract bills every due period (regression: one invoice only)", async () => {
+  jar.clear();
+  assert.equal((await req("POST", "/auth/login", { body: admin })).status, 200);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const created = await req("POST", "/subscriptions", {
+    body: {
+      customerId,
+      planId,
+      startDate: yesterday,
+      lines: [{ productId, quantity: 1 }],
+    },
+  });
+  assert.equal(created.status, 201, show(created));
+  recurringId = created.json?.data?.id;
+  // No contract end was supplied: the contract is open-ended.
+  assert.equal(created.json?.data?.expiryDate, null, show(created));
+  for (const path of ["quotation", "confirm", "activate"]) {
+    const transitioned = await req("POST", `/subscriptions/${recurringId}/${path}`, { body: {} });
+    assert.equal(transitioned.status, 200, show(transitioned));
+  }
+
+  // Period 1: [yesterday, today). Period 2 becomes due as soon as it is billed,
+  // because next_billing_at advances to today — a second run must invoice it.
+  const firstRun = await req("POST", "/billing/run", { body: {} });
+  assert.equal(firstRun.status, 200, show(firstRun));
+  assert.ok(
+    firstRun.json?.data?.invoices?.some((invoice) => invoice.subscriptionId === recurringId),
+    show(firstRun),
+  );
+  const secondRun = await req("POST", "/billing/run", { body: {} });
+  assert.equal(secondRun.status, 200, show(secondRun));
+  assert.ok(
+    secondRun.json?.data?.invoices?.some((invoice) => invoice.subscriptionId === recurringId),
+    show(secondRun),
+  );
+
+  const list = await req("GET", `/invoices?subscriptionId=${recurringId}&pageSize=100`);
+  assert.equal(list.status, 200, show(list));
+  assert.equal(list.json?.data?.length, 2, show(list));
+  const periods = list.json.data
+    .map((invoice) => ({ start: invoice.periodStart, end: invoice.periodEnd }))
+    .sort((a, b) => (a.start < b.start ? -1 : 1));
+  assert.equal(periods[0].start, yesterday, show(periods));
+  assert.equal(periods[0].end, periods[1].start, show(periods));
+
+  const detail = await req("GET", `/subscriptions/${recurringId}`);
+  assert.equal(detail.status, 200, show(detail));
+  assert.equal(detail.json?.data?.status, "ACTIVE");
+  assert.ok(detail.json?.data?.nextBillingAt, show(detail));
+});
+
+await step("payment accepts a date-only paidAt without failing", async () => {
+  assert.ok(recurringId, "The recurring subscription must exist before paying its invoice.");
+  const list = await req("GET", `/invoices?subscriptionId=${recurringId}&pageSize=100`);
+  assert.equal(list.status, 200, show(list));
+  const target = (list.json?.data ?? []).find((invoice) => invoice.status === "DRAFT");
+  assert.ok(target, show(list));
+  const confirmed = await req("POST", `/invoices/${target.id}/confirm`, { body: {} });
+  assert.equal(confirmed.status, 200, show(confirmed));
+  // A bare YYYY-MM-DD paidAt previously produced an Invalid Date (HTTP 500).
+  const paid = await req("POST", `/invoices/${target.id}/payments`, {
+    body: { method: "cash", amount: "0.01", paidAt: today },
+  });
+  assert.equal(paid.status, 201, show(paid));
+  assert.equal(paid.json?.data?.payments?.[0]?.paidAt, `${today} 00:00:00`);
 });
 
 if (failures > 0) {

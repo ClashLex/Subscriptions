@@ -1,6 +1,6 @@
 import { RowDataPacket, type PoolConnection, type ResultSetHeader } from "mysql2/promise";
 import { randomUUID } from "node:crypto";
-import { addDaysIso, addIntervalIso, mysqlUtc, todayIso } from "../../lib/dates.js";
+import { addDaysIso, addIntervalIso, mysqlUtc, parseUtc, todayIso } from "../../lib/dates.js";
 import { fromCents, toCents } from "../../lib/money.js";
 import { query, withTransaction } from "../../config/db.js";
 import { consumeDiscountUse, type DiscountRuleRow } from "../discounts/discounts.service.js";
@@ -101,36 +101,40 @@ function inclusiveCents(cents: bigint, rate: string): bigint {
   return (cents * toCents(rate)) / (10000n + toCents(rate));
 }
 
-/** Distributes `total` cents over shares proportionally (floor, remainder to last). */
+/**
+ * Distributes `total` cents across shares by largest remainder (Hamilton
+ * method): every share gets its floored proportion, then leftover cents go to
+ * the largest fractional parts in index order. Unlike "remainder to last", no
+ * line can absorb the whole discount simply because it is the last one when
+ * each proportional share floors to zero.
+ */
 function allocateCents(total: bigint, shares: bigint[]): bigint[] {
   const totalShare = shares.reduce((sum, share) => sum + share, 0n);
   if (totalShare === 0n) {
     return shares.map(() => 0n);
   }
-  const allocated: bigint[] = [];
-  let used = 0n;
-  for (let index = 0; index < shares.length; index += 1) {
-    if (index === shares.length - 1) {
-      allocated.push(total - used);
-      break;
+  const allocated = shares.map((share) => (total * share) / totalShare);
+  const remainders = shares.map((share, index) => ({
+    index,
+    remainder: (total * share) % totalShare,
+  }));
+  remainders.sort((a, b) => {
+    if (a.remainder === b.remainder) {
+      return a.index - b.index;
     }
-    const share = (total * valueAt(shares, index, "discount share")) / totalShare;
-    allocated.push(share);
-    used += share;
+    return a.remainder > b.remainder ? -1 : 1;
+  });
+  let leftover = total - allocated.reduce((sum, value) => sum + value, 0n);
+  for (let slot = 0; leftover > 0n; slot += 1) {
+    const target = valueAt(remainders, slot % remainders.length, "discount remainder");
+    allocated[target.index] = valueAt(allocated, target.index, "discount allocation") + 1n;
+    leftover -= 1n;
   }
   return allocated;
 }
 
 function invoiceNumber(id: number): string {
   return `INV-${String(id).padStart(6, "0")}`;
-}
-
-function duplicatePeriod(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-  const mysqlError = error as { code?: string; sqlMessage?: string };
-  return mysqlError.code === "ER_DUP_ENTRY" && mysqlError.sqlMessage?.includes("uq_invoice_period") === true;
 }
 
 interface RuleCandidate {
@@ -166,7 +170,17 @@ async function selectDiscount(
     return null;
   }
 
-  const today = todayIso();
+  // One redemption per rule per subscription: load them all in one query
+  // instead of probing per candidate rule.
+  const [redemptionRows] = await connection.execute(
+    "SELECT DISTINCT discount_rule_id FROM discount_redemptions WHERE subscription_id = ?",
+    [subscriptionId],
+  );
+  const redeemedRuleIds = new Set(
+    (redemptionRows as Array<RowDataPacket & { discount_rule_id: number }>).map((row) =>
+      Number(row.discount_rule_id),
+    ),
+  );
 
   // Product scope map in a single query.
   const scopedRules = candidates.filter((rule) => rule.scope === "PRODUCTS");
@@ -186,26 +200,22 @@ async function selectDiscount(
     }
   }
 
+  const now = new Date();
   let best: RuleCandidate | null = null;
   for (const rule of candidates) {
-    const startIso = rule.starts_at?.slice(0, 10) ?? null;
-    const endIso = rule.ends_at?.slice(0, 10) ?? null;
-    if (startIso !== null && today < startIso) {
+    // Full datetime comparison: a rule ending at 18:00 must stop applying that
+    // evening, not only on the next calendar day.
+    if (rule.starts_at !== null && now < parseUtc(rule.starts_at)) {
       continue;
     }
-    if (endIso !== null && today > endIso) {
+    if (rule.ends_at !== null && now > parseUtc(rule.ends_at)) {
       continue;
     }
     if (rule.usage_limit !== null && rule.usage_count >= rule.usage_limit) {
       continue;
     }
     // Project redemption policy: one redemption per rule per subscription.
-    const [redemptionRows] = await connection.execute(
-      "SELECT id FROM discount_redemptions WHERE discount_rule_id = ? AND subscription_id = ? LIMIT 1",
-      [rule.id, subscriptionId],
-    );
-    const redeemed = redemptionRows as RowDataPacket[];
-    if (redeemed.length > 0) {
+    if (redeemedRuleIds.has(rule.id)) {
       continue;
     }
 
@@ -306,6 +316,17 @@ async function billOne(
       // A contract end inside the interval truncates the final period.
       const periodEnd =
         expiry !== null && expiry < newNextIso ? expiry : newNextIso;
+
+      // Deterministic retry guard: a period that already has an invoice is
+      // reported as ALREADY_BILLED instead of relying on driver error text.
+      // The uq_invoice_period unique key stays as the final defence.
+      const [existingRows] = await connection.execute(
+        "SELECT id FROM invoices WHERE subscription_id = ? AND period_start = ? AND period_end = ? LIMIT 1",
+        [subscriptionId, nextIso, periodEnd],
+      );
+      if ((existingRows as RowDataPacket[]).length > 0) {
+        return { reason: "ALREADY_BILLED" as const };
+      }
 
       const lines = await loadSubscriptionLines(connection, subscriptionId);
       if (lines.length === 0) {
@@ -466,7 +487,10 @@ async function billOne(
     }
     return created;
   } catch (error) {
-    if (duplicatePeriod(error)) {
+    // Only a concurrent run that slipped between the pre-check and the INSERT
+    // can still hit the period key; any other failure propagates.
+    if (typeof error === "object" && error !== null
+      && (error as { code?: string }).code === "ER_DUP_ENTRY") {
       return { subscriptionId, subscriptionNumber, reason: "ALREADY_BILLED" };
     }
     throw error;

@@ -180,6 +180,7 @@ export interface SubscriptionDetail {
   status: SubscriptionStatus;
   startDate: string | null;
   expiryDate: string | null;
+  quotationValidUntil: string | null;
   paymentTermsDays: number;
   nextBillingAt: string | null;
   previousSubscriptionId: number | null;

@@ -1,7 +1,7 @@
 import { RowDataPacket, type PoolConnection, ResultSetHeader } from "mysql2/promise";
 import { AppError } from "../../middleware/errors.js";
 import { query, execute, withTransaction } from "../../config/db.js";import { addMoney, multiplyMoney, inclusiveTaxComponent, percentOf, toCents } from "../../lib/money.js";
-import { todayIso, addDaysIso, addIntervalIso, parseUtc, mysqlUtc } from "../../lib/dates.js";
+import { todayIso, addDaysIso, parseUtc, mysqlUtc } from "../../lib/dates.js";
 import { getProductById, listVariantsForProduct } from "../products/products.service.js";
 import { getTaxById } from "../taxes/taxes.service.js";
 import { getPlanById, type PlanRow } from "../plans/plans.service.js";
@@ -22,6 +22,7 @@ export interface SubscriptionRow extends RowDataPacket {
   status: SubscriptionStatus;
   start_date: string | null;
   expiry_date: string | null;
+  quotation_valid_until: string | null;
   payment_terms_days: number;
   next_billing_at: string | null;
   previous_subscription_id: number | null;
@@ -322,6 +323,73 @@ async function loadLines(subscriptionId: number): Promise<SubscriptionLineRow[]>
   );
 }
 
+/**
+ * Locks one subscription row for a lifecycle transition. Every state change
+ * reads and writes under this lock so two concurrent requests cannot both
+ * pass the same transition guard.
+ */
+async function lockSubscription(
+  connection: PoolConnection,
+  id: number,
+): Promise<SubscriptionRow> {
+  const [rows] = await connection.execute(
+    "SELECT * FROM subscriptions WHERE id = ? LIMIT 1 FOR UPDATE",
+    [id],
+  );
+  const row = (rows as SubscriptionRow[])[0];
+  if (!row) {
+    throw new AppError(404, "NOT_FOUND", "Subscription not found.");
+  }
+  return row;
+}
+
+async function loadLinesWith(
+  connection: PoolConnection,
+  subscriptionId: number,
+): Promise<SubscriptionLineRow[]> {
+  const [rows] = await connection.execute(
+    `SELECT id, subscription_id, product_id, variant_id, description_snapshot, quantity,
+            unit_price, tax_id, tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot, line_amount
+     FROM subscription_lines WHERE subscription_id = ? ORDER BY id`,
+    [subscriptionId],
+  );
+  return rows as SubscriptionLineRow[];
+}
+
+/**
+ * Copies already-snapshotted lines onto a new subscription. Renewals use this
+ * so the agreed price and tax snapshot survive catalogue edits or deletions; a
+ * deleted product must not block renewal (product_id is simply preserved as
+ * the stored foreign key, NULL once the catalogue row is gone).
+ */
+async function insertSnapshotLines(
+  connection: PoolConnection,
+  subscriptionId: number,
+  lines: SubscriptionLineRow[],
+): Promise<void> {
+  for (const line of lines) {
+    await connection.execute(
+      `INSERT INTO subscription_lines
+       (subscription_id, product_id, variant_id, description_snapshot, quantity, unit_price,
+        tax_id, tax_name_snapshot, tax_rate_snapshot, tax_mode_snapshot, line_amount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        subscriptionId,
+        line.product_id,
+        line.variant_id,
+        line.description_snapshot,
+        line.quantity,
+        line.unit_price,
+        line.tax_id,
+        line.tax_name_snapshot,
+        line.tax_rate_snapshot,
+        line.tax_mode_snapshot,
+        line.line_amount,
+      ],
+    );
+  }
+}
+
 async function loadEvents(subscriptionId: number): Promise<SubscriptionEventRow[]> {
   return query<SubscriptionEventRow[]>(
     `SELECT e.id, e.subscription_id, e.event_type, e.from_status, e.to_status, e.reason,
@@ -378,6 +446,7 @@ export interface SubscriptionDetail {
   status: SubscriptionStatus;
   startDate: string | null;
   expiryDate: string | null;
+  quotationValidUntil: string | null;
   paymentTermsDays: number;
   nextBillingAt: string | null;
   previousSubscriptionId: number | null;
@@ -432,6 +501,7 @@ export async function getSubscriptionDetail(id: number): Promise<SubscriptionDet
     status: row.status,
     startDate: row.start_date,
     expiryDate: row.expiry_date,
+    quotationValidUntil: row.quotation_valid_until,
     paymentTermsDays: row.payment_terms_days,
     nextBillingAt: row.next_billing_at,
     previousSubscriptionId: row.previous_subscription_id,
@@ -540,6 +610,16 @@ export async function createSubscription(
   await requireCustomer(dto.customerId);
   const startDate = dto.startDate ?? todayIso();
   validatePlanAvailability(plan, startDate);
+  // An omitted contract end means an open-ended subscription that keeps
+  // billing every interval until it is closed (the normal recurring case).
+  const expiryDate = dto.expiryDate ?? null;
+  if (expiryDate !== null && expiryDate <= startDate) {
+    throw new AppError(
+      400,
+      "INVALID_CONTRACT_END",
+      `The contract end (${expiryDate}) must be after the start date (${startDate}).`,
+    );
+  }
 
   let templateId: number | null = null;
   let lineInputs: Array<SubscriptionLineInput & { unitPrice?: string }>;
@@ -590,7 +670,7 @@ export async function createSubscription(
         planId: dto.planId,
         templateId,
         startDate,
-        expiryDate: null,
+        expiryDate,
         paymentTermsDays: dto.paymentTermsDays ?? 0,
         createdBy: actorId,
         previousSubscriptionId: null,
@@ -620,31 +700,34 @@ export async function updateSubscription(
   dto: SubscriptionUpdateDto,
   actorId: number,
 ): Promise<SubscriptionDetail> {
-  const rows = await query<SubscriptionRow[]>(
-    "SELECT * FROM subscriptions WHERE id = ? LIMIT 1",
-    [id],
-  );
-  const subscription = rows[0];
-  if (!subscription) {
-    throw new AppError(404, "NOT_FOUND", "Subscription not found.");
-  }
-  if (subscription.status !== "DRAFT" && subscription.status !== "QUOTATION") {
-    throw new AppError(
-      409,
-      "INVALID_TRANSITION",
-      `Subscription fields are frozen after confirmation (currently ${subscription.status}).`,
-    );
-  }
-  if (dto.planId !== undefined && dto.planId !== subscription.plan_id) {
-    const plan = await getPlanById(dto.planId);
-    if (!plan) {
-      throw new AppError(404, "PLAN_NOT_FOUND", `Plan ${dto.planId} does not exist.`);
-    }
-    const nextStart = dto.startDate ?? subscription.start_date ?? todayIso();
-    validatePlanAvailability(plan, nextStart);
-  }
-
   await withTransaction(async (connection) => {
+    const subscription = await lockSubscription(connection, id);
+    if (subscription.status !== "DRAFT" && subscription.status !== "QUOTATION") {
+      throw new AppError(
+        409,
+        "INVALID_TRANSITION",
+        `Subscription fields are frozen after confirmation (currently ${subscription.status}).`,
+      );
+    }
+
+    const nextPlanId = dto.planId ?? subscription.plan_id;
+    const nextStart = dto.startDate ?? subscription.start_date ?? todayIso();
+    const plan = await getPlanById(nextPlanId);
+    if (!plan) {
+      throw new AppError(404, "PLAN_NOT_FOUND", `Plan ${nextPlanId} does not exist.`);
+    }
+    // A plan swap or a moved start date must still leave a sellable contract.
+    if (dto.planId !== undefined || dto.startDate !== undefined) {
+      validatePlanAvailability(plan, nextStart);
+    }
+    if (dto.expiryDate !== undefined && dto.expiryDate !== null && dto.expiryDate <= nextStart) {
+      throw new AppError(
+        400,
+        "INVALID_CONTRACT_END",
+        `The contract end (${dto.expiryDate}) must be after the start date (${nextStart}).`,
+      );
+    }
+
     const sets: string[] = [];
     const params: Array<string | number | null> = [];
     if (dto.startDate !== undefined) {
@@ -659,20 +742,25 @@ export async function updateSubscription(
       sets.push("plan_id = ?");
       params.push(dto.planId);
     }
+    if (dto.expiryDate !== undefined) {
+      sets.push("expiry_date = ?");
+      params.push(dto.expiryDate);
+    }
     if (sets.length > 0) {
       await connection.execute(`UPDATE subscriptions SET ${sets.join(", ")} WHERE id = ?`, [...params, id]);
     }
+
     if (dto.lines !== undefined && dto.lines.length > 0) {
-      const planIdForValidation = dto.planId ?? subscription.plan_id;
-      const plan = await getPlanById(planIdForValidation);
-      if (!plan) {
-        throw new AppError(404, "PLAN_NOT_FOUND", "The subscription's plan was not found.");
-      }
       validateMinimumQuantity(plan, dto.lines);
       const lines = await resolveCatalogueLines(dto.lines);
       await connection.execute("DELETE FROM subscription_lines WHERE subscription_id = ?", [id]);
       await insertSubscriptionLines(connection, id, lines);
+    } else {
+      // The plan may change without new lines: the existing quantities must
+      // still satisfy the new plan's minimum.
+      validateMinimumQuantity(plan, await loadLinesWith(connection, id));
     }
+
     await recordEvent(
       connection,
       id,
@@ -695,42 +783,33 @@ export async function updateSubscription(
 // Lifecycle transitions
 // ---------------------------------------------------------------------------
 
-async function loadSubscriptionRow(id: number): Promise<SubscriptionRow> {
-  const rows = await query<SubscriptionRow[]>(
-    "SELECT * FROM subscriptions WHERE id = ? LIMIT 1",
-    [id],
-  );
-  const row = rows[0];
-  if (!row) {
-    throw new AppError(404, "NOT_FOUND", "Subscription not found.");
-  }
-  return row;
-}
-
 export async function submitQuotation(
   id: number,
   actorId: number,
   options: { validityDays?: number; reason?: string } = {},
 ): Promise<SubscriptionDetail> {
-  const subscription = await loadSubscriptionRow(id);
-  assertTransition(subscription.status, "QUOTATION");
-  let validityDays = options.validityDays;
-  if (validityDays === undefined) {
-    if (subscription.quotation_template_id === null) {
-      validityDays = 15;
-    } else {
-      const rows = await query<Array<RowDataPacket & { validity_days: number }>>(
-        "SELECT validity_days FROM quotation_templates WHERE id = ? LIMIT 1",
-        [subscription.quotation_template_id],
-      );
-      validityDays = rows[0]?.validity_days ?? 15;
-    }
-  }
-  const expiry = addDaysIso(todayIso(), validityDays);
   await withTransaction(async (connection) => {
+    const subscription = await lockSubscription(connection, id);
+    assertTransition(subscription.status, "QUOTATION");
+    let validityDays = options.validityDays;
+    if (validityDays === undefined) {
+      if (subscription.quotation_template_id === null) {
+        validityDays = 15;
+      } else {
+        const [rows] = await connection.execute(
+          "SELECT validity_days FROM quotation_templates WHERE id = ? LIMIT 1",
+          [subscription.quotation_template_id],
+        );
+        const template = (rows as Array<RowDataPacket & { validity_days: number }>)[0];
+        validityDays = template?.validity_days ?? 15;
+      }
+    }
+    // Quotation validity is a separate concern from the contract end; the
+    // expiry_date column is reserved for the contract term.
+    const validUntil = addDaysIso(todayIso(), validityDays);
     await connection.execute(
-      "UPDATE subscriptions SET status = 'QUOTATION', expiry_date = ? WHERE id = ?",
-      [expiry, id],
+      "UPDATE subscriptions SET status = 'QUOTATION', quotation_valid_until = ? WHERE id = ?",
+      [validUntil, id],
     );
     await recordEvent(
       connection,
@@ -739,7 +818,7 @@ export async function submitQuotation(
       "SUBMITTED_QUOTATION",
       subscription.status,
       "QUOTATION",
-      options.reason ?? `Quotation valid until ${expiry}.`,
+      options.reason ?? `Quotation valid until ${validUntil}.`,
     );
   });
   return (await getSubscriptionDetail(id)) as SubscriptionDetail;
@@ -750,17 +829,17 @@ export async function confirmQuotation(
   actorId: number,
   options: { reason?: string } = {},
 ): Promise<SubscriptionDetail> {
-  const subscription = await loadSubscriptionRow(id);
-  assertTransition(subscription.status, "CONFIRMED");
-  const today = todayIso();
-  if (subscription.expiry_date !== null && subscription.expiry_date < today) {
-    throw new AppError(
-      400,
-      "QUOTATION_EXPIRED",
-      `The quotation expired on ${subscription.expiry_date} and cannot be confirmed.`,
-    );
-  }
   await withTransaction(async (connection) => {
+    const subscription = await lockSubscription(connection, id);
+    assertTransition(subscription.status, "CONFIRMED");
+    const today = todayIso();
+    if (subscription.quotation_valid_until !== null && subscription.quotation_valid_until < today) {
+      throw new AppError(
+        400,
+        "QUOTATION_EXPIRED",
+        `The quotation expired on ${subscription.quotation_valid_until} and cannot be confirmed.`,
+      );
+    }
     await connection.execute("UPDATE subscriptions SET status = 'CONFIRMED' WHERE id = ?", [id]);
     await recordEvent(connection, id, actorId, "CONFIRMED", subscription.status, "CONFIRMED", options.reason);
   });
@@ -772,36 +851,33 @@ export async function activateSubscription(
   actorId: number,
   options: { reason?: string } = {},
 ): Promise<SubscriptionDetail> {
-  const subscription = await loadSubscriptionRow(id);
-  assertTransition(subscription.status, "ACTIVE");
-  const today = todayIso();
-  if (subscription.start_date === null) {
-    throw new AppError(400, "START_DATE_REQUIRED", "Set a start date before activation.");
-  }
-  if (subscription.start_date > today) {
-    throw new AppError(
-      400,
-      "START_DATE_NOT_REACHED",
-      `Activation is permitted on or after the start date (${subscription.start_date}).`,
-    );
-  }
-  const plan = await getPlanById(subscription.plan_id);
-  if (!plan) {
-    throw new AppError(404, "PLAN_NOT_FOUND", "The subscription's plan no longer exists.");
-  }
-  // Contract end: honour an explicitly set later expiry, otherwise close after
-  // one billing interval; a quotation-validity expiry before start is replaced.
-  let expiry = subscription.expiry_date;
-  const periodEnd = addIntervalIso(subscription.start_date, plan.billing_interval_unit, plan.billing_interval_count);
-  if (expiry === null || expiry <= subscription.start_date) {
-    expiry = periodEnd;
-  } else if (expiry < periodEnd) {
-    expiry = periodEnd;
-  }
   await withTransaction(async (connection) => {
+    const subscription = await lockSubscription(connection, id);
+    assertTransition(subscription.status, "ACTIVE");
+    const today = todayIso();
+    if (subscription.start_date === null) {
+      throw new AppError(400, "START_DATE_REQUIRED", "Set a start date before activation.");
+    }
+    if (subscription.start_date > today) {
+      throw new AppError(
+        400,
+        "START_DATE_NOT_REACHED",
+        `Activation is permitted on or after the start date (${subscription.start_date}).`,
+      );
+    }
+    // The contract end is whatever staff agreed (or open-ended). It is never
+    // derived from the billing interval, so an open-ended subscription keeps
+    // producing an invoice every cycle.
+    if (subscription.expiry_date !== null && subscription.expiry_date <= today) {
+      throw new AppError(
+        400,
+        "CONTRACT_ENDED",
+        `The contract ended on ${subscription.expiry_date} and cannot be activated.`,
+      );
+    }
     await connection.execute(
-      `UPDATE subscriptions SET status = 'ACTIVE', next_billing_at = ?, expiry_date = ? WHERE id = ?`,
-      [mysqlUtc(new Date(`${subscription.start_date}T00:00:00Z`)), expiry, id],
+      "UPDATE subscriptions SET status = 'ACTIVE', next_billing_at = ? WHERE id = ?",
+      [mysqlUtc(new Date(`${subscription.start_date}T00:00:00Z`)), id],
     );
     await recordEvent(
       connection,
@@ -810,7 +886,12 @@ export async function activateSubscription(
       "ACTIVATED",
       subscription.status,
       "ACTIVE",
-      options.reason ?? `Billing from ${subscription.start_date}; contract ends ${expiry}.`,
+      options.reason
+        ?? `Billing from ${subscription.start_date}; ${
+          subscription.expiry_date === null
+            ? "open-ended until closed"
+            : `contract ends ${subscription.expiry_date}`
+        }.`,
     );
   });
   return (await getSubscriptionDetail(id)) as SubscriptionDetail;
@@ -821,17 +902,17 @@ export async function pauseSubscription(
   actorId: number,
   options: { reason?: string } = {},
 ): Promise<SubscriptionDetail> {
-  const subscription = await loadSubscriptionRow(id);
-  assertTransition(subscription.status, "PAUSED");
-  const plan = await getPlanById(subscription.plan_id);
-  if (!plan) {
-    throw new AppError(404, "PLAN_NOT_FOUND", "The subscription's plan no longer exists.");
-  }
-  if (!plan.allow_pause) {
-    throw new AppError(409, "PAUSE_NOT_ALLOWED", `Plan ${plan.name} does not allow pausing.`);
-  }
-  const pausedAt = new Date();
   await withTransaction(async (connection) => {
+    const subscription = await lockSubscription(connection, id);
+    assertTransition(subscription.status, "PAUSED");
+    const plan = await getPlanById(subscription.plan_id);
+    if (!plan) {
+      throw new AppError(404, "PLAN_NOT_FOUND", "The subscription's plan no longer exists.");
+    }
+    if (!plan.allow_pause) {
+      throw new AppError(409, "PAUSE_NOT_ALLOWED", `Plan ${plan.name} does not allow pausing.`);
+    }
+    const pausedAt = new Date();
     await connection.execute(
       "UPDATE subscriptions SET status = 'PAUSED', paused_at = ? WHERE id = ?",
       [mysqlUtc(pausedAt), id],
@@ -854,17 +935,17 @@ export async function resumeSubscription(
   actorId: number,
   options: { reason?: string } = {},
 ): Promise<SubscriptionDetail> {
-  const subscription = await loadSubscriptionRow(id);
-  assertTransition(subscription.status, "ACTIVE");
-  // Recommended MVP policy: shift the next billing date by the paused duration.
-  const pausedAt = subscription.paused_at !== null ? parseUtc(subscription.paused_at) : null;
-  const resumedAt = new Date();
-  const shiftedMs = pausedAt === null ? 0 : resumedAt.getTime() - pausedAt.getTime();
-  let reason = options.reason;
-  if (reason === undefined && pausedAt !== null) {
-    reason = `Resumed after ${(shiftedMs / 86400000).toFixed(2)} day(s); billing shifted accordingly.`;
-  }
   await withTransaction(async (connection) => {
+    const subscription = await lockSubscription(connection, id);
+    assertTransition(subscription.status, "ACTIVE");
+    // Recommended MVP policy: shift the next billing date by the paused duration.
+    const pausedAt = subscription.paused_at !== null ? parseUtc(subscription.paused_at) : null;
+    const resumedAt = new Date();
+    const shiftedMs = pausedAt === null ? 0 : resumedAt.getTime() - pausedAt.getTime();
+    let reason = options.reason;
+    if (reason === undefined && pausedAt !== null) {
+      reason = `Resumed after ${(shiftedMs / 86400000).toFixed(2)} day(s); billing shifted accordingly.`;
+    }
     if (subscription.next_billing_at !== null && pausedAt !== null) {
       const next = new Date(parseUtc(subscription.next_billing_at).getTime() + shiftedMs);
       await connection.execute(
@@ -893,31 +974,31 @@ export async function closeSubscription(
   actorRole: "ADMIN" | "STAFF" | "CUSTOMER",
   options: { reason?: string } = {},
 ): Promise<SubscriptionDetail> {
-  const subscription = await loadSubscriptionRow(id);
-  if (subscription.status !== "ACTIVE" && subscription.status !== "PAUSED") {
-    throw new AppError(
-      409,
-      "INVALID_TRANSITION",
-      `Only ACTIVE or PAUSED subscriptions can be closed (currently ${subscription.status}).`,
-    );
-  }
-  const plan = await getPlanById(subscription.plan_id);
-  if (!plan) {
-    throw new AppError(404, "PLAN_NOT_FOUND", "The subscription's plan no longer exists.");
-  }
-  let override = false;
-  if (subscription.status === "ACTIVE" && !plan.allow_early_close) {
-    if (actorRole !== "ADMIN") {
+  await withTransaction(async (connection) => {
+    const subscription = await lockSubscription(connection, id);
+    if (subscription.status !== "ACTIVE" && subscription.status !== "PAUSED") {
       throw new AppError(
         409,
-        "CLOSE_NOT_ALLOWED",
-        `Plan ${plan.name} does not allow early closure; an Admin override is required.`,
+        "INVALID_TRANSITION",
+        `Only ACTIVE or PAUSED subscriptions can be closed (currently ${subscription.status}).`,
       );
     }
-    override = true;
-  }
-  const closedAt = new Date();
-  await withTransaction(async (connection) => {
+    const plan = await getPlanById(subscription.plan_id);
+    if (!plan) {
+      throw new AppError(404, "PLAN_NOT_FOUND", "The subscription's plan no longer exists.");
+    }
+    let override = false;
+    if (subscription.status === "ACTIVE" && !plan.allow_early_close) {
+      if (actorRole !== "ADMIN") {
+        throw new AppError(
+          409,
+          "CLOSE_NOT_ALLOWED",
+          `Plan ${plan.name} does not allow early closure; an Admin override is required.`,
+        );
+      }
+      override = true;
+    }
+    const closedAt = new Date();
     await connection.execute(
       "UPDATE subscriptions SET status = 'CLOSED', closed_at = ? WHERE id = ?",
       [mysqlUtc(closedAt), id],
@@ -941,35 +1022,27 @@ export async function renewSubscription(
   actorId: number,
   options: { reason?: string } = {},
 ): Promise<SubscriptionDetail> {
-  const subscription = await loadSubscriptionRow(id);
-  if (subscription.status !== "ACTIVE" && subscription.status !== "CLOSED") {
-    throw new AppError(
-      409,
-      "INVALID_TRANSITION",
-      `Only ACTIVE or CLOSED subscriptions can be renewed (currently ${subscription.status}).`,
-    );
-  }
-  const plan = await getPlanById(subscription.plan_id);
-  if (!plan) {
-    throw new AppError(404, "PLAN_NOT_FOUND", "The subscription's plan no longer exists.");
-  }
-  if (!plan.allow_renewal) {
-    throw new AppError(409, "RENEWAL_NOT_ALLOWED", `Plan ${plan.name} does not allow renewal.`);
-  }
-  const previousLines = await loadLines(id);
-  const newStart = addDaysIso(subscription.expiry_date ?? todayIso(), 1);
-  const lines = await resolveCatalogueLines(
-    previousLines.map((line) => ({
-      productId: line.product_id ?? 0,
-      variantId: line.variant_id ?? undefined,
-      quantity: line.quantity,
-      taxId: line.tax_id ?? undefined,
-      // Renewal continues the previously agreed price, not today's catalogue.
-      unitPrice: line.unit_price,
-    })),
-  );
-  validateMinimumQuantity(plan, lines);
   const newId = await withTransaction(async (connection) => {
+    const subscription = await lockSubscription(connection, id);
+    if (subscription.status !== "ACTIVE" && subscription.status !== "CLOSED") {
+      throw new AppError(
+        409,
+        "INVALID_TRANSITION",
+        `Only ACTIVE or CLOSED subscriptions can be renewed (currently ${subscription.status}).`,
+      );
+    }
+    const plan = await getPlanById(subscription.plan_id);
+    if (!plan) {
+      throw new AppError(404, "PLAN_NOT_FOUND", "The subscription's plan no longer exists.");
+    }
+    if (!plan.allow_renewal) {
+      throw new AppError(409, "RENEWAL_NOT_ALLOWED", `Plan ${plan.name} does not allow renewal.`);
+    }
+    // Renewal continues the agreed lines verbatim, so a deleted catalogue
+    // product or a price change cannot block or rewrite the new contract.
+    const previousLines = await loadLinesWith(connection, id);
+    validateMinimumQuantity(plan, previousLines);
+    const newStart = addDaysIso(subscription.expiry_date ?? todayIso(), 1);
     const idOut = await insertSubscription(connection, {
       customerId: subscription.customer_id,
       planId: subscription.plan_id,
@@ -980,7 +1053,7 @@ export async function renewSubscription(
       createdBy: actorId,
       previousSubscriptionId: subscription.id,
     });
-    await insertSubscriptionLines(connection, idOut, lines);
+    await insertSnapshotLines(connection, idOut, previousLines);
     await recordEvent(
       connection,
       idOut,

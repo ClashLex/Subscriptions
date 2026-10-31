@@ -205,6 +205,7 @@ interface CreateDraft {
   planId: number | null;
   templateId: number | null;
   startDate: string;
+  expiryDate: string;
   paymentTermsDays: string;
   items: ItemRow[];
 }
@@ -231,6 +232,7 @@ function SubscriptionCreator({
     planId: null,
     templateId: null,
     startDate: todayIsoLocal(),
+    expiryDate: "",
     paymentTermsDays: "0",
     items: [{ productId: null, variantId: null, quantity: "1", taxId: null }],
   });
@@ -268,6 +270,8 @@ function SubscriptionCreator({
       customerId: draft.customerId,
       planId: draft.planId,
       startDate: draft.startDate || undefined,
+      // Blank means open-ended: keep billing every interval until closed.
+      expiryDate: draft.expiryDate === "" ? undefined : draft.expiryDate,
       paymentTermsDays: Math.max(Number.parseInt(draft.paymentTermsDays, 10) || 0, 0),
     };
     if (draft.templateId !== null) {
@@ -346,11 +350,18 @@ function SubscriptionCreator({
             </Select>
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label="Start date (today if blank)">
             <TextInput
               value={draft.startDate}
               onChange={(event) => setDraft({ ...draft, startDate: event.target.value })}
+            />
+          </Field>
+          <Field label="Contract end (blank = open-ended)">
+            <TextInput
+              value={draft.expiryDate}
+              placeholder="YYYY-MM-DD"
+              onChange={(event) => setDraft({ ...draft, expiryDate: event.target.value })}
             />
           </Field>
           <Field label="Payment terms (days)">
@@ -423,8 +434,13 @@ function SubscriptionDetailModal({
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<ApiError | null>(null);
   const [editing, setEditing] = useState(false);
-  const [editDraft, setEditDraft] = useState<{ startDate: string; paymentTermsDays: string }>({
+  const [editDraft, setEditDraft] = useState<{
+    startDate: string;
+    expiryDate: string;
+    paymentTermsDays: string;
+  }>({
     startDate: "",
+    expiryDate: "",
     paymentTermsDays: "0",
   });
 
@@ -436,6 +452,7 @@ function SubscriptionDetailModal({
     if (detail !== null) {
       setEditDraft({
         startDate: detail.startDate ?? "",
+        expiryDate: detail.expiryDate ?? "",
         paymentTermsDays: String(detail.paymentTermsDays),
       });
     }
@@ -460,15 +477,29 @@ function SubscriptionDetailModal({
     }
   }
 
+  /** Draft/quotation field edits hit PATCH /subscriptions/:id (no /edit path). */
   async function saveEdit() {
     if (detail === null) {
       return;
     }
-    await act("edit", {
-      startDate: editDraft.startDate === "" ? undefined : editDraft.startDate,
-      paymentTermsDays: Math.max(Number.parseInt(editDraft.paymentTermsDays, 10) || 0, 0),
-    }, "PATCH");
-    setEditing(false);
+    setBusy(true);
+    setActionError(null);
+    try {
+      const response = await request<SubscriptionDetail>(`/subscriptions/${detail.id}`, {
+        method: "PATCH",
+        body: {
+          startDate: editDraft.startDate === "" ? undefined : editDraft.startDate,
+          expiryDate: editDraft.expiryDate === "" ? null : editDraft.expiryDate,
+          paymentTermsDays: Math.max(Number.parseInt(editDraft.paymentTermsDays, 10) || 0, 0),
+        },
+      });
+      onRefresh(response);
+      setEditing(false);
+    } catch (caught) {
+      setActionError(asApiError(caught));
+    } finally {
+      setBusy(false);
+    }
   }
 
   function eventTone(eventType: string): "green" | "indigo" | "amber" | "slate" {
@@ -506,8 +537,12 @@ function SubscriptionDetailModal({
               {detail.startDate ?? "—"}
             </p>
             <p>
-              <span className="block text-xs uppercase tracking-wide text-slate-400">Quotation / contract end</span>
-              {detail.expiryDate ?? "—"}
+              <span className="block text-xs uppercase tracking-wide text-slate-400">Contract end</span>
+              {detail.expiryDate ?? "Open-ended"}
+            </p>
+            <p>
+              <span className="block text-xs uppercase tracking-wide text-slate-400">Quotation valid until</span>
+              {detail.quotationValidUntil ?? "—"}
             </p>
             <p>
               <span className="block text-xs uppercase tracking-wide text-slate-400">Next billing</span>
@@ -580,6 +615,12 @@ function SubscriptionDetailModal({
                       className="w-32"
                       value={editDraft.startDate}
                       onChange={(event) => setEditDraft({ ...editDraft, startDate: event.target.value })}
+                    />
+                    <TextInput
+                      className="w-32"
+                      placeholder="Contract end"
+                      value={editDraft.expiryDate}
+                      onChange={(event) => setEditDraft({ ...editDraft, expiryDate: event.target.value })}
                     />
                     <TextInput
                       className="w-20"

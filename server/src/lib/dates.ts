@@ -49,9 +49,15 @@ export function addIntervalIso(
   return date.toISOString().slice(0, 10);
 }
 
-/** Parses "YYYY-MM-DD HH:MM:SS" (MySQL, UTC) or ISO strings into a Date. */
+/**
+ * Parses "YYYY-MM-DD HH:MM:SS" (MySQL, UTC), a bare "YYYY-MM-DD" date, or an
+ * ISO timestamp into a Date. A date-only value means midnight UTC — appending
+ * "Z" to it directly would produce an Invalid Date.
+ */
 export function parseUtc(value: string): Date {
-  return new Date(value.includes(" ") ? `${value.replace(" ", "T")}Z` : `${value}Z`);
+  const normalized = value.trim().replace(" ", "T");
+  const withTime = normalized.length === 10 ? `${normalized}T00:00:00` : normalized;
+  return new Date(withTime.endsWith("Z") ? withTime : `${withTime}Z`);
 }
 
 /** Formats a Date back into the MySQL UTC datetime string form. */
