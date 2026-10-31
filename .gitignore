@@ -121,4 +121,13 @@ Desktop.ini
 .turbo/
 *.local
 
+# ============================================================
+# Documentation: only the root README is tracked in Git.
+# Every other Markdown file (including the docs/ pack) is
+# intentionally untracked and maintained outside the repository.
+# ============================================================
+
+*.md
+!/README.md
+
 

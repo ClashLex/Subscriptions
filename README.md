@@ -1,6 +1,6 @@
 # Subscriptions — Project Documentation
 
-> **Documentation update rule:** After every completed implementation step, update this file before beginning the next step. Change only information verified against the current code, database, tests, or running UI. Record the date, step completed, resulting behaviour, and any deviation or unresolved issue. Update `CHANGELOG.md` at the same time. Never mark an unimplemented or untested item as complete.
+> **Documentation update rule:** After every completed implementation step, update the project documentation under `docs/` before beginning the next step. Change only information verified against the current code, database, tests, or running UI. Record the date, step completed, resulting behaviour, any deviation or unresolved issue, and update the changelog. Never mark an unimplemented or untested item as complete.
 
 ## Project summary
 
@@ -13,28 +13,28 @@ This is an independent hackathon implementation. It is not an official Odoo prod
 
 ## Start here
 
-Read these documents in order when you are new to the project:
+The documentation pack in `docs/` should be read in this order when you are new to the project:
 
-1. `REQUIREMENTS.md` — what the challenge explicitly asks for.
-2. `BUSINESS_WORKFLOWS.md` — how a customer, subscription, invoice, and payment move through the system.
-3. `ARCHITECTURE.md` — how the browser, API, backend services, and database connect.
-4. `DATA_MODEL.md` — the entities and relationships that store the business data.
-5. `BILLING_AND_FINANCE.md` — recurring billing, invoices, taxes, discounts, payments, and reporting rules.
-6. `SECURITY_AND_ACCESS.md` — authentication, roles, and customer data boundaries.
-7. `API_CONTRACT.md` and `UI_UX_SPEC.md` — how the frontend and backend should communicate and what each user sees.
-8. `IMPLEMENTATION_PLAN.md` — the recommended build order and completion criteria.
-9. `TEST_PLAN.md` — how to verify the implementation.
-10. `DEVELOPMENT_GUIDE.md` and `DEPLOYMENT_AND_DEMO.md` — how to run, configure, and demonstrate it.
-11. `DEVELOPMENT_BLUEPRINT.md` — the earlier detailed technical blueprint with setup commands, code patterns, and extended guidance.
+1. Requirements and acceptance criteria — what the challenge explicitly asks for.
+2. Business workflows — how a customer, subscription, invoice, and payment move through the system.
+3. Architecture — how the browser, API, backend services, and database connect.
+4. Data model — the entities and relationships that store the business data.
+5. Billing and finance — recurring billing, invoices, taxes, discounts, payments, and reporting rules.
+6. Security and access — authentication, roles, and customer data boundaries.
+7. API contract and UI/UX specification — how the frontend and backend communicate and what each user sees.
+8. Implementation plan — the recommended build order and completion criteria.
+9. Test plan — how to verify the implementation.
+10. Development guide and deployment/demo guide — how to run, configure, and demonstrate it.
+11. The detailed development blueprint — setup commands, code patterns, and extended guidance.
 
 ## Source of truth and decision hierarchy
 
 Use this order when documents or code disagree:
 
 1. The supplied `Subscription_Management_System.pdf` is the source for the challenge's functional requirements. It is not bundled here because this ZIP contains Markdown documentation.
-2. A later, explicit decision recorded in this documentation and `CHANGELOG.md` controls implementation choices that the challenge does not specify.
+2. A later, explicit decision recorded in this documentation and the changelog controls implementation choices that the challenge does not specify.
 3. The code, migrations, and tests describe what is currently implemented. Documentation must be brought into line with verified code after each implementation step.
-4. `DEVELOPMENT_BLUEPRINT.md` is the earlier detailed reference. Its suggestions are not automatically organizer requirements.
+4. The detailed development blueprint is the earlier reference. Its suggestions are not automatically organizer requirements.
 
 Keep requirements separate from recommended design decisions. Where the challenge leaves behaviour unspecified, document the choice as a project decision rather than presenting it as a mandatory challenge rule.
 
@@ -74,8 +74,8 @@ Invoice balance and finance dashboard update
 
 ## Project status
 
-This documentation package is an initial planning baseline. It does **not** mean that the application features have already been implemented. Keep the checklists in `IMPLEMENTATION_PLAN.md` and `TEST_PLAN.md` accurate as development progresses.
+This documentation package is an initial planning baseline. It does **not** mean that the application features have already been implemented. Keep the checklists in the implementation plan and the test plan accurate as development progresses.
 
 ## Repository documentation convention
 
-This pack uses one fixed location: the project README lives at the repository root, and all other documentation files live in a root `docs/` directory. Do not maintain duplicate copies that drift apart. Keep documentation tracked in Git (do not ignore it), so each implementation step can update docs and `CHANGELOG.md` in the same commit.
+The README at the repository root is the only documentation file tracked in Git. All other documentation lives in a root `docs/` directory and is intentionally excluded from version control; the `.gitignore` ignores every Markdown file except this README. Keep the README a standalone overview that does not duplicate pack contents, so copies cannot drift apart.
