@@ -277,7 +277,7 @@ async function selectDiscount(
 /** One invoice inside its own transaction; per-subscription isolation. */
 async function billOne(
   subscriptionId: number,
-  actorId: number,
+  actorId: number | null,
   nowStamp: string,
 ): Promise<InvoiceResult | SkippedResult> {
   const subscriptionNumber = await fetchSubscriptionNumber(subscriptionId);
@@ -523,7 +523,7 @@ function parseStamp(value: string): Date {
 /** One auto-close inside its own transaction (Phase 5 wiring of plan expiry). */
 async function autoCloseOne(
   subscriptionId: number,
-  actorId: number,
+  actorId: number | null,
 ): Promise<{ subscriptionId: number; subscriptionNumber: string; closed: boolean }> {
   await withTransaction(async (connection) => {
     const [lockedRows] = await connection.execute(
@@ -571,7 +571,7 @@ async function autoCloseOne(
  * contracts whose plan says so. Each subscription is isolated in its own
  * transaction so one bad row cannot veto the run.
  */
-export async function runBilling(actorId: number): Promise<BillingRunResult> {
+export async function runBilling(actorId: number | null): Promise<BillingRunResult> {
   const nowStamp = mysqlUtc(new Date());
   const candidates = await query<DueCandidateRow[]>(
     `SELECT s.id, s.subscription_number, s.next_billing_at, s.expiry_date,

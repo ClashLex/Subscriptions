@@ -76,7 +76,7 @@ Invoice balance and finance dashboard update
 
 This documentation package is an initial planning baseline. It does **not** mean that the application features have already been implemented. Keep the checklists in the implementation plan and the test plan accurate as development progresses.
 
-Implementation progress so far: the local infrastructure, authentication and roles, catalogue and plans, quotation/subscription backend and staff screens, and the customer subscription portal are implemented and verified. The Phase 5 billing API now includes an Admin-only run trigger, discount rules, recurring invoice generation with transactional snapshots, invoice confirmation/cancellation, customer-scoped invoice reads, and atomic payment recording with partial/full balance handling. These flows are covered by API acceptance tests. The billing/invoice UI, scheduler, invoice email/print, and finance dashboard remain to be implemented.
+Implementation progress so far: the local infrastructure, authentication and roles, catalogue and plans, quotation/subscription backend and staff screens, and the customer subscription portal are implemented and verified. The Phase 5 billing API now includes an Admin-only run trigger, discount rules, recurring invoice generation with transactional snapshots, invoice confirmation/cancellation, customer-scoped invoice reads, and atomic payment recording with partial/full balance handling. These flows are covered by API acceptance tests. An optional automatic billing runner (`BILLING_RUN_INTERVAL_MINUTES`, off unless set) reuses the same billing service as the Admin trigger. The billing/invoice UI, invoice email/print, and finance dashboard remain to be implemented.
 
 ## Repository documentation convention
 

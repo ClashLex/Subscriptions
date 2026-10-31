@@ -28,6 +28,10 @@ const envSchema = z.object({
   // acceptance suites issue hundreds of requests in quick succession.
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
 
+  // Automatic billing run interval in minutes. Unset/0 keeps the scheduler off
+  // and billing runs only through the Admin-only manual trigger.
+  BILLING_RUN_INTERVAL_MINUTES: z.coerce.number().int().min(0).optional(),
+
   DB_HOST: z.string().min(1, "DB_HOST is required"),
   DB_PORT: z.coerce.number().int().positive().default(3306),
   DB_NAME: z.string().min(1, "DB_NAME is required"),
