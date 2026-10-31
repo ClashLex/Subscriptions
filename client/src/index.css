@@ -20,7 +20,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 ::selection { background: #c7f4a1; color: #162920; }
 :focus-visible { outline: 3px solid #71ad75; outline-offset: 3px; }
 
-.app-shell { min-height: 100vh; background: radial-gradient(circle at 91% 4%, #e7f3df 0, transparent 30%), var(--paper); display: flex; flex-direction: column; }
+.app-shell { position: relative; isolation: isolate; min-height: 100vh; background: var(--paper); display: flex; flex-direction: column; }
+.app-shell__background { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: radial-gradient(circle at 90% 4%, #e2f2da 0, transparent 33%), radial-gradient(circle at 6% 90%, #e7f0e6 0, transparent 38%), var(--paper); }
+.app-shell__background > .dither-container { position: absolute; inset: 0; opacity: .42; mix-blend-mode: multiply; }
 .app-header { position: sticky; top: 0; z-index: 30; background: #14261d; color: #f2f8ed; border-bottom: 1px solid #2c4936; box-shadow: 0 14px 42px -30px #0d1a13; }
 .app-header__inner { width: min(100% - 48px, 1512px); min-height: 82px; margin: auto; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: clamp(18px, 3vw, 44px); align-items: center; }
 .app-header__identity { display: flex; align-items: center; gap: 24px; min-width: 0; }
@@ -38,9 +40,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .app-header__account-text small { display: block; overflow: hidden; text-overflow: ellipsis; color: #a9c1ae; font-size: 10px; }
 .app-header__signout.ui-button { color: #d5e9d8; padding: 8px; font-size: 11px; }
 .app-header__signout.ui-button:hover { background: #2c4635; }
-.app-main { width: min(100% - 48px, 1360px); margin: 0 auto; padding: 36px 0 64px; flex: 1; }
+.app-main { position: relative; z-index: 1; width: min(100% - 48px, 1360px); margin: 0 auto; padding: 36px 0 64px; flex: 1; }
 .app-main--portal { max-width: 1180px; }
-.app-footer { width: min(100% - 48px, 1360px); margin: auto; padding: 22px 0 28px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 14px; color: #7c8c80; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+.app-footer { position: relative; z-index: 1; width: min(100% - 48px, 1360px); margin: auto; padding: 22px 0 28px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 14px; color: #7c8c80; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
 .app-footer span:last-child { text-transform: none; letter-spacing: 0; font-size: 11px; }
 .eyebrow { display: flex; align-items: center; gap: 10px; color: #428069; font-size: 11px; font-weight: 820; letter-spacing: .18em; text-transform: uppercase; }
 .eyebrow__line { width: 24px; height: 2px; border-radius: 2px; background: #8bc69a; }

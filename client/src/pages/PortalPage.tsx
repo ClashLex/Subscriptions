@@ -6,6 +6,7 @@ import { AppShellHeader } from "../ui/AppShellHeader.js";
 import SpotlightCard from "../reactbits/SpotlightCard.js";
 import { Badge, Button, ErrorBanner, Modal, PageHeading, Pagination } from "../ui/components.js";
 import { EmptyState } from "../ui/EmptyState.js";
+import { WorkspaceBackground } from "../ui/WorkspaceBackground.js";
 import { CustomerInvoices, CustomerPayments } from "./PortalBilling.js";
 
 function statusTone(status: SubscriptionListItem["status"]): "green" | "amber" | "slate" | "indigo" {
@@ -87,6 +88,7 @@ export function PortalPage() {
   const openId = Number(params.get("open"));
 
   return <div className="app-shell app-shell--portal">
+    <WorkspaceBackground />
     <AppShellHeader mode="customer" />
     <main className="app-main app-main--portal">
       <div className="portal-intro"><div><p className="eyebrow"><span className="eyebrow__line" /> Your account</p><h1>Good to have you here<span>.</span></h1><p>Everything about your plans, invoices, and payments in one place.</p></div><span className="portal-intro__tag">MY BRIGHTLOOP</span></div>

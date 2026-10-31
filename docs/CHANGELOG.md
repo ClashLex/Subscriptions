@@ -6,6 +6,11 @@ All notable project, documentation, and implementation changes should be recorde
 
 ## [Unreleased]
 
+### Dither workspace background — 2026-10-31
+
+- Extended the supplied React Bits Dither component from the sign-in visual to a soft, fixed background behind Admin, Staff, and Customer pages. The canvas ignores pointer input and uses a low-resolution palette so forms, tables, and cards remain readable. A CSS gradient is visible when WebGL2 is unavailable.
+- The client build and local production-like HTTPS billing check passed. Browser inspection confirmed the canvas appears on Admin and customer pages with no horizontal overflow at 390 px; the headless test browser used the CSS fallback because its WebGL2 context was unavailable.
+
 ### Redesigned browser interface — 2026-10-31
 
 - Rebuilt the sign-in, registration, and password-reset pages around a responsive split layout with a React Bits Dither visual and CSS fallback when WebGL2 cannot render it.
