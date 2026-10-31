@@ -4,6 +4,7 @@ import { asApiError, type ApiError } from "../lib/api.js";
 import { loginDestination } from "../lib/navigation.js";
 import { useSession } from "../state/session.js";
 import { Button, ErrorBanner, Field, TextInput } from "../ui/components.js";
+import { AuthShell } from "../ui/AuthShell.js";
 
 /** Admin/Staff land in the back office; customers get the portal. */
 export function LoginPage() {
@@ -32,19 +33,14 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-sm space-y-4 rounded-xl bg-white p-6 shadow-md">
-        <div className="space-y-1 text-center">
-          <h1 className="text-xl font-semibold text-slate-900">Sign in</h1>
-          <p className="text-sm text-slate-500">Subscriptions management</p>
-        </div>
+    <AuthShell title="Sign in" description="Welcome back. Pick up where your subscriptions left off.">
         <ErrorBanner error={error} />
         {flashMessage && !error ? (
           <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
             {flashMessage}
           </div>
         ) : null}
-        <form className="space-y-3" onSubmit={submit}>
+        <form className="space-y-5" onSubmit={submit}>
           <Field label="Email">
             <TextInput
               type="email"
@@ -67,16 +63,15 @@ export function LoginPage() {
             {busy ? "Signing in\u2026" : "Sign in"}
           </Button>
         </form>
-        <p className="text-center text-sm">
+        <p className="text-sm">
           <Link className="font-medium text-indigo-600 hover:underline" to="/forgot-password">Forgot password?</Link>
         </p>
-        <p className="text-center text-sm text-slate-500">
+        <p className="text-sm text-slate-500">
           New customer?{" "}
           <Link className="font-medium text-indigo-600 hover:underline" to="/register">
             Create an account
           </Link>
         </p>
-      </div>
-    </main>
+    </AuthShell>
   );
 }

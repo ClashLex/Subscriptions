@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { asApiError, formatMoney, list, request, type ApiError, type PageMeta } from "../lib/api.js";
 import type { InvoiceDetail, InvoiceListItem, PaymentListItem } from "../lib/types.js";
 import { Badge, Button, ErrorBanner, Modal, PageHeading, Pagination, TableShell } from "../ui/components.js";
+import { EmptyState } from "../ui/EmptyState.js";
 
 export function CustomerInvoices({ openId }: { openId: number | null }) {
   const [page, setPage] = useState(1);
@@ -39,11 +40,13 @@ export function CustomerInvoices({ openId }: { openId: number | null }) {
   useEffect(() => { if (openId !== null) void open(openId); }, [openId, open]);
 
   return <section>
-    <PageHeading title="My invoices" subtitle="Issued invoices, due dates, balances, and line details for your account." />
+    <PageHeading eyebrow="My account" title="My invoices" subtitle="Issued invoices, due dates, balances, and line details for your account." />
     <ErrorBanner error={error} />
+    {rows?.length === 0 ? <EmptyState icon="◇" title="No invoices issued yet." description="An invoice appears here after your subscription reaches a billing date and the Brightloop team confirms it."><p>You can return to My subscriptions to review your plan and next billing date.</p></EmptyState> : null}
+    {rows?.length !== 0 ?
     <TableShell head={<tr><th className="px-3 py-2">Invoice</th><th className="px-3 py-2">Subscription / period</th><th className="px-3 py-2">Due</th><th className="px-3 py-2">Total</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Action</th></tr>}>
-      {rows === null && !error ? <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">Loading invoices…</td></tr> : rows?.length === 0 ? <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">No issued invoices yet.</td></tr> : rows?.map((row) => <tr key={row.id}><td className="px-3 py-2 font-medium">{row.invoiceNumber}</td><td className="px-3 py-2 text-xs text-slate-600">{row.subscriptionNumber}<br />{row.periodStart} – {row.periodEnd}</td><td className="px-3 py-2">{row.dueDate}</td><td className="px-3 py-2">{row.currencyCode} {row.grandTotal}</td><td className="px-3 py-2"><Badge tone={row.status === "PAID" ? "green" : row.status === "CANCELLED" ? "slate" : "indigo"}>{row.status}</Badge></td><td className="px-3 py-2 text-right"><Button variant="secondary" onClick={() => void open(row.id)}>View</Button></td></tr>)}
-    </TableShell>
+      {rows === null && !error ? <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">Loading invoices…</td></tr> : rows?.map((row) => <tr key={row.id}><td className="px-3 py-2 font-medium">{row.invoiceNumber}</td><td className="px-3 py-2 text-xs text-slate-600">{row.subscriptionNumber}<br />{row.periodStart} – {row.periodEnd}</td><td className="px-3 py-2">{row.dueDate}</td><td className="px-3 py-2">{row.currencyCode} {row.grandTotal}</td><td className="px-3 py-2"><Badge tone={row.status === "PAID" ? "green" : row.status === "CANCELLED" ? "slate" : "indigo"}>{row.status}</Badge></td><td className="px-3 py-2 text-right"><Button variant="secondary" onClick={() => void open(row.id)}>View</Button></td></tr>)}
+    </TableShell> : null}
     <Pagination meta={meta} onPage={setPage} />
     <Modal open={selectedId !== null} title={detail?.invoiceNumber ?? "Invoice"} onClose={() => { detailRequest.current += 1; setSelectedId(null); setDetail(null); }} wide>
       {detailLoading ? <p className="text-sm text-slate-500">Loading invoice…</p> : null}<ErrorBanner error={detailError} />
@@ -73,11 +76,13 @@ export function CustomerPayments({ onInvoice }: { onInvoice: (id: number) => voi
   }, [page]);
 
   return <section>
-    <PageHeading title="My payments" subtitle="Payments recorded against your invoices." />
+    <PageHeading eyebrow="My account" title="My payments" subtitle="Payments recorded against your invoices." />
     <ErrorBanner error={error} />
+    {rows?.length === 0 ? <EmptyState icon="↓" title="No payments recorded yet." description="Payments made against your confirmed invoices will be listed here with their date, method, and reference." /> : null}
+    {rows?.length !== 0 ?
     <TableShell head={<tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Invoice</th><th className="px-3 py-2">Method</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Status</th></tr>}>
-      {rows === null && !error ? <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">Loading payments…</td></tr> : rows?.length === 0 ? <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">No payments recorded yet.</td></tr> : rows?.map((row) => <tr key={row.id}><td className="px-3 py-2">{row.paidAt}</td><td className="px-3 py-2"><button type="button" className="font-medium text-indigo-700 hover:underline" onClick={() => onInvoice(row.invoiceId)}>{row.invoiceNumber}</button></td><td className="px-3 py-2">{row.method}</td><td className="px-3 py-2">{row.reference ?? "—"}</td><td className="px-3 py-2">{formatMoney(row.amount)}</td><td className="px-3 py-2">{row.status}</td></tr>)}
-    </TableShell>
+      {rows === null && !error ? <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">Loading payments…</td></tr> : rows?.map((row) => <tr key={row.id}><td className="px-3 py-2">{row.paidAt}</td><td className="px-3 py-2"><button type="button" className="font-medium text-indigo-700 hover:underline" onClick={() => onInvoice(row.invoiceId)}>{row.invoiceNumber}</button></td><td className="px-3 py-2">{row.method}</td><td className="px-3 py-2">{row.reference ?? "—"}</td><td className="px-3 py-2">{formatMoney(row.amount)}</td><td className="px-3 py-2">{row.status}</td></tr>)}
+    </TableShell> : null}
     <Pagination meta={meta} onPage={setPage} />
   </section>;
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { asApiError, request, type ApiError } from "../lib/api.js";
 import { Button, ErrorBanner, Field, TextInput } from "../ui/components.js";
+import { AuthShell } from "../ui/AuthShell.js";
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -33,14 +34,9 @@ export function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-sm space-y-4 rounded-xl bg-white p-6 shadow-md">
-        <div className="space-y-1 text-center">
-          <h1 className="text-xl font-semibold text-slate-900">Create your account</h1>
-          <p className="text-sm text-slate-500">Customer registration is self-service; passwords are policy-checked.</p>
-        </div>
+    <AuthShell title="Create your account" description="Your subscriptions, invoices, and payments are one step away.">
         <ErrorBanner error={error} />
-        <form className="space-y-3" onSubmit={submit}>
+        <form className="space-y-5" onSubmit={submit}>
           <Field label="Display name (optional)">
             <TextInput
               value={displayName}
@@ -73,13 +69,12 @@ export function RegisterPage() {
             {busy ? "Creating\u2026" : "Create account"}
           </Button>
         </form>
-        <p className="text-center text-sm text-slate-500">
+        <p className="text-sm text-slate-500">
           Already registered?{" "}
           <Link className="font-medium text-indigo-600 hover:underline" to="/login">
             Sign in
           </Link>
         </p>
-      </div>
-    </main>
+    </AuthShell>
   );
 }

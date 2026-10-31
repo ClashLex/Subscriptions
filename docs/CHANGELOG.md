@@ -6,6 +6,13 @@ All notable project, documentation, and implementation changes should be recorde
 
 ## [Unreleased]
 
+### Redesigned browser interface — 2026-10-31
+
+- Rebuilt the sign-in, registration, and password-reset pages around a responsive split layout with a React Bits Dither visual and CSS fallback when WebGL2 cannot render it.
+- Added shared Admin, Staff, and Customer navigation using the real React Bits PillNav component, with active routes and responsive menu behavior. Redesigned the finance overview, customer subscription cards, empty states, buttons, fields, status badges, tables, dialogs, and overall color and typography system. Included the upstream React Bits source license notice.
+- Fixed a mobile horizontal overflow caused by PillNav's hidden measurement row. The local production-like HTTPS browser check passed across billing, payment, session, and SMTP capture. The seeded demo rehearsal passed across Admin and two Customer accounts, payment error states, and 390 px and 320 px layouts. Client build passed; lint completed with warnings in existing page patterns and upstream React Bits source.
+- A hosted deployment and external SMTP provider are still unverified because neither is configured.
+
 ### Improved against the supplied problem statement — 2026-10-31
 
 - Added migration 009 to classify core and optional product lines, track whether each subscription add-on is enabled, and preserve existing line prices and enabled state. Newly created subscriptions price their first core line from the plan plus a variant adjustment; other lines use catalogue or template prices.

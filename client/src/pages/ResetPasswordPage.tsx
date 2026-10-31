@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { asApiError, request, type ApiError } from "../lib/api.js";
 import { Button, ErrorBanner, Field, TextInput } from "../ui/components.js";
+import { AuthShell } from "../ui/AuthShell.js";
 
 export function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -26,23 +27,17 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-sm space-y-4 rounded-xl bg-white p-6 shadow-md">
-        <div className="space-y-1 text-center">
-          <h1 className="text-xl font-semibold text-slate-900">Choose a new password</h1>
-          <p className="text-sm text-slate-500">Reset links are valid for one hour and can be used once.</p>
-        </div>
+    <AuthShell title="Choose a new password" description="Create a strong password to keep your account secure.">
         {token.length === 0 ? <p className="text-sm text-red-700">This reset link is missing its token.</p> : null}
         <ErrorBanner error={error} />
-        <form className="space-y-3" onSubmit={submit}>
+        <form className="space-y-5" onSubmit={submit}>
           <Field label="New password">
             <TextInput type="password" required autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
           </Field>
           <p className="text-xs text-slate-500">More than 8 characters with uppercase, lowercase, and a special character.</p>
           <Button type="submit" disabled={busy || token.length === 0} className="w-full">{busy ? "Updating…" : "Update password"}</Button>
         </form>
-        <p className="text-center text-sm"><Link className="font-medium text-indigo-600 hover:underline" to="/login">Back to sign in</Link></p>
-      </div>
-    </main>
+        <p className="text-sm"><Link className="font-medium text-indigo-600 hover:underline" to="/login">Back to sign in</Link></p>
+    </AuthShell>
   );
 }

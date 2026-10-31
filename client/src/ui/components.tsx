@@ -5,6 +5,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
+import { useEffect } from "react";
 import { asApiError, type ApiError } from "../lib/api.js";
 
 // ---------------------------------------------------------------------------
@@ -14,11 +15,10 @@ import { asApiError, type ApiError } from "../lib/api.js";
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
 const BUTTON_STYLES: Record<ButtonVariant, string> = {
-  primary: "bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-indigo-600",
-  secondary:
-    "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:outline-slate-400",
-  danger: "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus-visible:outline-red-400",
-  ghost: "text-slate-600 hover:bg-slate-100 focus-visible:outline-slate-400",
+  primary: "ui-button--primary",
+  secondary: "ui-button--secondary",
+  danger: "ui-button--danger",
+  ghost: "ui-button--ghost",
 };
 
 export function Button({
@@ -29,9 +29,7 @@ export function Button({
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium
-        shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2
-        disabled:cursor-not-allowed disabled:opacity-50 ${BUTTON_STYLES[variant]} ${className}`}
+      className={`ui-button ${BUTTON_STYLES[variant]} ${className}`}
     />
   );
 }
@@ -40,15 +38,12 @@ export function Button({
 // Form fields
 // ---------------------------------------------------------------------------
 
-const INPUT_CLASS =
-  "block w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-inner\n" +
-  "  placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100\n" +
-  "  disabled:cursor-not-allowed disabled:bg-slate-100";
+const INPUT_CLASS = "ui-input";
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block space-y-1">
-      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+    <label className="ui-field">
+      <span>{label}</span>
       {children}
     </label>
   );
@@ -79,14 +74,14 @@ export function Checkbox({
 }) {
   return (
     <label
-      className={`flex items-center gap-2 text-sm text-slate-700 ${disabled ? "opacity-50" : "cursor-pointer"}`}
+      className={`ui-checkbox ${disabled ? "opacity-50" : "cursor-pointer"}`}
     >
       <input
         type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        className="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200"
+        className="size-4 rounded border-slate-300 accent-[#33705d] focus:ring-[#aee8c6]"
       />
       {label}
     </label>
@@ -100,17 +95,17 @@ export function Checkbox({
 type BadgeTone = "green" | "slate" | "amber" | "red" | "indigo";
 
 const BADGE_STYLES: Record<BadgeTone, string> = {
-  green: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-  slate: "bg-slate-100 text-slate-600 ring-slate-500/20",
-  amber: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  red: "bg-red-50 text-red-700 ring-red-600/20",
-  indigo: "bg-indigo-50 text-indigo-700 ring-indigo-600/20",
+  green: "ui-badge--green",
+  slate: "ui-badge--slate",
+  amber: "ui-badge--amber",
+  red: "ui-badge--red",
+  indigo: "ui-badge--indigo",
 };
 
 export function Badge({ tone = "slate", children }: { tone?: BadgeTone; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${BADGE_STYLES[tone]}`}
+      className={`ui-badge ${BADGE_STYLES[tone]}`}
     >
       {children}
     </span>
@@ -123,7 +118,7 @@ export function ErrorBanner({ error }: { error: ApiError | null }) {
     return null;
   }
   return (
-    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+    <div className="ui-error" role="alert">
       <p className="font-medium">
         {error.code ? `${error.code}: ` : ""}
         {error.message}
@@ -151,8 +146,9 @@ export function ErrorText({ error }: { error: unknown }) {
 
 export function PageLoader({ label = "Loading\u2026" }: { label?: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100">
-      <p className="text-sm text-slate-500">{label}</p>
+    <div className="ui-loader">
+      <span className="ui-loader__mark" aria-hidden="true" />
+      <p>{label}</p>
     </div>
   );
 }
@@ -174,17 +170,26 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
 }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
   if (!open) {
     return null;
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 pt-16">
+    <div className="ui-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div
-        className={`w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-xl bg-white p-5 shadow-xl`}
+        className={`ui-modal ${wide ? "ui-modal--wide" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+        <div className="ui-modal__heading">
+          <h2>{title}</h2>
           <Button variant="ghost" aria-label="Close" onClick={onClose}>
             {"\u00D7"}
           </Button>
@@ -201,24 +206,25 @@ export function Modal({
 
 export function TableShell({ head, children }: { head: ReactNode; children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className="ui-table-shell">
+      <div className="ui-table-scroll">
+        <table className="ui-table">
+          <thead>
             {head}
           </thead>
-          <tbody className="divide-y divide-slate-100">{children}</tbody>
+          <tbody>{children}</tbody>
         </table>
       </div>
     </div>
   );
 }
 
-export function PageHeading({ title, subtitle }: { title: string; subtitle?: string }) {
+export function PageHeading({ title, subtitle, eyebrow = "Workspace" }: { title: string; subtitle?: string; eyebrow?: string }) {
   return (
-    <div className="mb-4">
-      <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-      {subtitle ? <p className="text-sm text-slate-500">{subtitle}</p> : null}
+    <div className="ui-page-heading">
+      <p className="eyebrow"><span className="eyebrow__line" /> {eyebrow}</p>
+      <h1>{title}</h1>
+      {subtitle ? <p>{subtitle}</p> : null}
     </div>
   );
 }
@@ -234,7 +240,7 @@ export function Pagination({
     return null;
   }
   return (
-    <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
+    <div className="ui-pagination">
       <span>
         Page {meta.page} of {meta.totalPages} {"\u00B7"} {meta.total} item(s)
       </span>

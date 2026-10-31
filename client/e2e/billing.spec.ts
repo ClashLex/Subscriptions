@@ -85,10 +85,10 @@ test("admin and customer can follow an invoice through billing and payment", asy
     await expect(page.getByRole("heading", { name: "My invoices" })).toBeVisible();
     await expect(page.getByRole("heading", { name: billed!.invoiceNumber })).toBeVisible();
     await page.getByRole("button", { name: "Close" }).click();
-    await page.getByRole("button", { name: "payments", exact: true }).click();
+    await page.getByRole("link", { name: "Payments", exact: true }).click();
     await expect(page.getByRole("heading", { name: "My payments" })).toBeVisible();
     await expect(page.getByText(`browser-${suffix}`)).toBeVisible();
-    await page.getByRole("button", { name: "subscriptions", exact: true }).click();
+    await page.getByRole("link", { name: "Subscriptions", exact: true }).click();
     await page.getByRole("button", { name: "Manage" }).click();
     await expect(page.getByText("Contract total before discounts: ₹1009.00")).toBeVisible();
     await page.getByRole("button", { name: "Switch off" }).click();

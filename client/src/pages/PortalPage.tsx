@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { asApiError, formatMoney, list, request, type ApiError, type PageMeta } from "../lib/api.js";
 import { STATUS_LABELS, type SubscriptionDetail, type SubscriptionListItem } from "../lib/types.js";
-import { useSession } from "../state/session.js";
-import { Badge, Button, ErrorBanner, Modal, Pagination, TableShell } from "../ui/components.js";
+import { AppShellHeader } from "../ui/AppShellHeader.js";
+import SpotlightCard from "../reactbits/SpotlightCard.js";
+import { Badge, Button, ErrorBanner, Modal, PageHeading, Pagination } from "../ui/components.js";
+import { EmptyState } from "../ui/EmptyState.js";
 import { CustomerInvoices, CustomerPayments } from "./PortalBilling.js";
 
 function statusTone(status: SubscriptionListItem["status"]): "green" | "amber" | "slate" | "indigo" {
@@ -54,12 +56,16 @@ function CustomerSubscriptions() {
   }
 
   return <section>
-    <h1 className="text-lg font-semibold text-slate-900">My subscriptions</h1>
-    <p className="mt-1 text-sm text-slate-500">Your quotations, contracts, and next billing dates.</p>
+    <PageHeading eyebrow="My account" title="My subscriptions" subtitle="Your plans, contract details, and next billing dates." />
     <div className="mt-4"><ErrorBanner error={error} /></div>
-    <TableShell head={<tr><th className="px-3 py-2">Number</th><th className="px-3 py-2">Plan</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Start / expiry</th><th className="px-3 py-2">Next billing</th><th className="px-3 py-2">Action</th></tr>}>
-      {rows === null && !error ? <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">Loading your subscriptions…</td></tr> : rows?.length === 0 ? <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">No subscriptions yet. Your first quotation will appear here once our team sets it up.</td></tr> : rows?.map((row) => <tr key={row.id}><td className="px-3 py-2 font-mono text-xs font-medium text-indigo-700">{row.subscriptionNumber}</td><td className="px-3 py-2">{row.planName}</td><td className="px-3 py-2"><Badge tone={statusTone(row.status)}>{STATUS_LABELS[row.status]}</Badge></td><td className="px-3 py-2 text-xs text-slate-600">{row.startDate ?? "∞"} → {row.expiryDate ?? "∞"}</td><td className="px-3 py-2 text-xs text-slate-600">{row.nextBillingAt?.slice(0, 10) ?? "—"}</td><td className="px-3 py-2"><Button variant="secondary" onClick={() => void open(row.id)}>Manage</Button></td></tr>)}
-    </TableShell>
+    {rows === null && !error ? <p className="portal-loading">Loading your subscriptions…</p> : null}
+    {rows?.length === 0 ? <EmptyState icon="↗" title="Your first plan starts here." description="This account has no subscriptions yet. A Brightloop team member needs to create a subscription for this customer account before it appears here."><p>Once your plan is confirmed and activated, you can manage add-ons and view billing details from this page.</p></EmptyState> : null}
+    {rows && rows.length > 0 ? <div className="subscription-grid">{rows.map((row) => <SpotlightCard className="subscription-card" theme="light" spotlightColor="#b8eaa5" intensity={.45} key={row.id}>
+      <div className="subscription-card__top"><span className="subscription-card__number">{row.subscriptionNumber}</span><Badge tone={statusTone(row.status)}>{STATUS_LABELS[row.status]}</Badge></div>
+      <h2>{row.planName}</h2>
+      <div className="subscription-card__facts"><span>Next billing <strong>{row.nextBillingAt?.slice(0, 10) ?? "Not scheduled"}</strong></span><span>Contract <strong>{row.startDate ?? "—"} → {row.expiryDate ?? "Open ended"}</strong></span></div>
+      <Button variant="secondary" onClick={() => void open(row.id)}>Manage</Button>
+    </SpotlightCard>)}</div> : null}
     <Pagination meta={meta} onPage={setPage} />
     <ErrorBanner error={detail === null ? detailError : null} />
     <Modal open={detail !== null} title={detail ? `${detail.subscriptionNumber} · ${detail.planName}` : "Subscription"} onClose={() => { setDetail(null); setDetailError(null); }} wide>
@@ -76,16 +82,16 @@ function CustomerSubscriptions() {
 }
 
 export function PortalPage() {
-  const session = useSession();
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "invoices" ? "invoices" : params.get("tab") === "payments" ? "payments" : "subscriptions";
   const openId = Number(params.get("open"));
 
-  return <div className="min-h-screen bg-slate-100">
-    <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3"><div className="flex items-center gap-3"><span className="text-sm font-semibold tracking-tight text-slate-900">Subscriptions</span><Badge tone="green">My portal</Badge></div><div className="flex min-w-0 items-center gap-2"><span className="max-w-44 truncate text-sm text-slate-600 sm:max-w-none" title={session.user?.email}>{session.user?.email}</span><Button variant="secondary" onClick={() => { void session.logout(); navigate("/"); }}>Sign out</Button></div></div>
-      <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-4">{(["subscriptions", "invoices", "payments"] as const).map((item) => <button key={item} type="button" onClick={() => setParams(item === "subscriptions" ? {} : { tab: item })} className={`rounded-t-md border-b-2 px-4 py-2 text-sm font-medium capitalize ${tab === item ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-600 hover:text-slate-900"}`}>{item}</button>)}</nav>
-    </header>
-    <main className="mx-auto max-w-5xl px-4 py-6">{tab === "subscriptions" ? <CustomerSubscriptions /> : tab === "invoices" ? <CustomerInvoices openId={Number.isSafeInteger(openId) && openId > 0 ? openId : null} /> : <CustomerPayments onInvoice={(id) => setParams({ tab: "invoices", open: String(id) })} />}</main>
+  return <div className="app-shell app-shell--portal">
+    <AppShellHeader mode="customer" />
+    <main className="app-main app-main--portal">
+      <div className="portal-intro"><div><p className="eyebrow"><span className="eyebrow__line" /> Your account</p><h1>Good to have you here<span>.</span></h1><p>Everything about your plans, invoices, and payments in one place.</p></div><span className="portal-intro__tag">MY BRIGHTLOOP</span></div>
+      {tab === "subscriptions" ? <CustomerSubscriptions /> : tab === "invoices" ? <CustomerInvoices openId={Number.isSafeInteger(openId) && openId > 0 ? openId : null} /> : <CustomerPayments onInvoice={(id) => setParams({ tab: "invoices", open: String(id) })} />}
+    </main>
+    <footer className="app-footer"><span>BRIGHTLOOP / CUSTOMER PORTAL</span><span>Made for a clearer relationship.</span></footer>
   </div>;
 }

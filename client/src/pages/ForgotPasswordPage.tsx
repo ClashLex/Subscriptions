@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { asApiError, request, type ApiError } from "../lib/api.js";
 import { Button, ErrorBanner, Field, TextInput } from "../ui/components.js";
+import { AuthShell } from "../ui/AuthShell.js";
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -27,12 +28,7 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-sm space-y-4 rounded-xl bg-white p-6 shadow-md">
-        <div className="space-y-1 text-center">
-          <h1 className="text-xl font-semibold text-slate-900">Reset your password</h1>
-          <p className="text-sm text-slate-500">Enter your account email to request a reset link.</p>
-        </div>
+    <AuthShell title="Reset your password" description="Enter your account email and we’ll send you a secure reset link.">
         <ErrorBanner error={error} />
         {result ? (
           <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -42,14 +38,13 @@ export function ForgotPasswordPage() {
             ) : null}
           </div>
         ) : null}
-        <form className="space-y-3" onSubmit={submit}>
+        <form className="space-y-5" onSubmit={submit}>
           <Field label="Email">
             <TextInput type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
           </Field>
           <Button type="submit" disabled={busy} className="w-full">{busy ? "Sending…" : "Send reset link"}</Button>
         </form>
-        <p className="text-center text-sm"><Link className="font-medium text-indigo-600 hover:underline" to="/login">Back to sign in</Link></p>
-      </div>
-    </main>
+        <p className="text-sm"><Link className="font-medium text-indigo-600 hover:underline" to="/login">Back to sign in</Link></p>
+    </AuthShell>
   );
 }

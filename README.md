@@ -21,13 +21,19 @@ The main workflow is: configure a product and plan, create a customer subscripti
 
 ## Technology
 
-- **Client:** React 19, TypeScript, Vite 8, Tailwind CSS 4.
+- **Client:** React 19, TypeScript, Vite 8, Tailwind CSS 4, and a shared responsive design system.
 - **Server:** Node.js, Express 5, TypeScript, Zod, MySQL2.
 - **Database:** MySQL 8.4 with ordered SQL migrations.
 - **Authentication:** MySQL-backed server sessions, HTTP-only cookies, and Argon2id password hashes.
 - **Money:** decimal strings at API boundaries and integer minor units for calculations.
 
 This is one modular application: the browser calls the versioned Express API, and the API reads and writes MySQL. During local development, Vite proxies `/api` requests to the server.
+
+### Interface
+
+The browser uses a forest-green and lime visual system across sign-in, registration, password reset, the Admin and Staff workspace, and the customer portal. The finance overview groups live subscription counts and currency-specific billing metrics. The customer portal presents subscription cards, invoice and payment history, and guidance when an account has no records. Shared navigation, form controls, tables, dialogs, status badges, and responsive layouts carry the design through the catalogue and billing screens.
+
+The navigation uses [React Bits PillNav](https://reactbits.dev/components/pill-nav); the sign-in visual uses React Bits Dither; metric and subscription cards use React Bits SpotlightCard. Their source is included under `client/src/reactbits/`, with the upstream copyright and license notice in [client/src/reactbits/LICENSE.txt](client/src/reactbits/LICENSE.txt). Dither needs WebGL2 for animation; a CSS visual remains when WebGL2 is unavailable, and reduced-motion settings shorten interface animation.
 
 ## Run locally
 
@@ -164,6 +170,8 @@ The [changelog](docs/CHANGELOG.md) records verification evidence and remaining g
 | Path | Contents |
 |---|---|
 | `client/src/pages/` | Role-specific React pages. |
+| `client/src/ui/` | Shared app shell, brand, controls, dialogs, and empty states. |
+| `client/src/reactbits/` | React Bits component source and its license notice. |
 | `client/src/lib/api.ts` | Shared browser API client and response handling. |
 | `server/src/modules/` | API routes, schemas, and business services. |
 | `server/src/jobs/` | Optional billing scheduler. |
