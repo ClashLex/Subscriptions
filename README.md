@@ -10,12 +10,12 @@ The application is under active development. The table separates features availa
 
 | Area | Available now |
 |---|---|
-| Browser | Sign in, customer registration and password reset; Admin and Staff catalogue, tax, plan, quotation template, subscription, invoice, payment, and discount screens; customer subscription list. |
-| API | Authentication and roles; customer directory; catalogue and plans; quotation and subscription lifecycle; discount rules; recurring invoice generation; invoice reads and confirmation/cancellation; payment recording and reads. |
+| Browser | Sign in, customer registration and password reset; Admin and Staff catalogue, tax, plan, quotation template, subscription, invoice, payment, and discount screens; finance overview; customer subscription, invoice, and payment views; printable invoices. |
+| API | Authentication and roles; customer directory; catalogue and plans; quotation and subscription lifecycle; discount rules; recurring invoice generation; invoice reads, confirmation, cancellation, and email delivery; payment recording and reads; finance summary. |
 | Billing trigger | Admin-only **Run billing** control on the invoice screen, `POST /api/v1/billing/run`, or an optional in-process scheduler. The scheduler is disabled by default. |
-| Still to build | Invoice email/PDF, finance dashboard, and customer invoice/payment screens. |
+| Still to build | Automated PDF attachments, broader recurrence/concurrency and live browser checks, performance and demo verification. |
 
-The main workflow is: configure a product and plan, create a customer subscription, submit and confirm its quotation, activate it, run billing when due, confirm the invoice, and record payments. Admins run billing from **Invoices & billing**. Admins and Staff can review invoices, confirm or cancel eligible invoices, record payments, and search payment history. Admins create, edit, activate, and deactivate discount rules; Staff can read active rules.
+The main workflow is: configure a product and plan, create a customer subscription, submit and confirm its quotation, activate it, run billing when due, confirm the invoice, and record payments. Admins run billing from **Invoices & billing**. Admins and Staff can review invoices, confirm or cancel eligible invoices, record payments, search payment history, print or save an invoice as a PDF through the browser, and email a confirmed or paid invoice link when SMTP is configured. The **Overview** shows dated invoiced and received amounts plus current outstanding and overdue balances. Admins create, edit, activate, and deactivate discount rules; Staff can read active rules.
 
 **Pricing rule:** a plan's `price` is a catalogue reference amount. Recurring invoice amounts come from the subscription's snapshotted product lines, followed by eligible discounts and taxes. The plan price does not add a fee or replace line prices. The plan and subscription screens label it as a reference price.
 
@@ -90,9 +90,9 @@ For a compiled API run, execute `npm.cmd run build` and then `npm.cmd run start`
 
 | Role | Main access |
 |---|---|
-| Admin | Configure products, variants, taxes, and plans; manage users; run billing; manage subscriptions and finance records. |
-| Staff | Read catalogue configuration and active discounts; create and edit quotation templates and subscriptions; review, confirm, or cancel eligible invoices and record payments in the browser. |
-| Customer | Register and sign in; see their own subscriptions in the portal and their own invoices/payments through the API. |
+| Admin | Configure products, variants, taxes, and plans; manage users; run billing; manage subscriptions and finance records; view the finance overview. |
+| Staff | Read catalogue configuration and active discounts; create and edit quotation templates and subscriptions; review, confirm, or cancel eligible invoices, email issued invoice links, record payments, and view the finance overview. |
+| Customer | Register and sign in; see their own subscriptions, issued invoices, invoice detail, and recorded payments in the portal; print or save their invoices as PDF. |
 
 Subscriptions follow **Draft → Quotation → Confirmed → Active**. Active subscriptions may be paused, resumed, closed, or renewed according to plan policy. Invoice generation snapshots line prices, tax, and any eligible discount. A unique database key prevents duplicate invoices for the same subscription period. Payments can cover part or all of a confirmed invoice; overpayments are rejected.
 
@@ -104,12 +104,15 @@ The optional scheduler uses `BILLING_RUN_INTERVAL_MINUTES` in `.env`. A positive
 2. In **Subscriptions**, complete the quotation and activate the subscription. Its line prices are the recurring billing basis.
 3. Optionally create a rule in **Discounts**. Choose a fixed amount or percentage, a whole subscription or selected products, and any minimums, date window, or usage limit. Only Admins can change rules.
 4. When an active subscription is due, open **Invoices & billing** and select **Run billing** as Admin. The screen reports how many subscriptions were scanned, invoiced, skipped, closed, or failed. Billing also runs automatically if the optional scheduler is enabled.
-5. Filter and open an invoice to review its line, discount, tax, total, payment, and outstanding-balance snapshots. Confirm a draft invoice before collecting payment. Eligible draft or unpaid confirmed invoices can be cancelled.
-6. Record a partial or full payment on a confirmed invoice. Use **Payments** for history and a link back to the invoice. The server rejects overpayments and updates the invoice to paid when its balance reaches zero.
+5. Filter and open an invoice to review its line, discount, tax, total, payment, and outstanding-balance snapshots. Confirm a draft invoice before collecting payment or emailing it. Eligible draft or unpaid confirmed invoices can be cancelled. Select **Print / save PDF** to use the browser's print dialog; **Email customer** sends a link to the customer's own portal invoice when SMTP is configured.
+6. Record a partial or full payment on a confirmed invoice. Use **Payments** for history and a link back to the invoice. The server rejects overpayments and updates the invoice to paid when its balance reaches zero. Customers see invoices that were confirmed and their payment history in **My portal**; draft invoices, including those cancelled before confirmation, stay hidden from them.
+7. Use **Overview** to choose an issue/payment date range. Invoiced totals include confirmed and paid invoices issued in that range; cash received includes successful payments in that range. Outstanding and overdue are current balances across all confirmed or paid invoices, and active subscriptions are a current count. Money is grouped by currency rather than summed across currencies.
 
 Billing is repeat-safe for an already invoiced subscription period. The browser's **Run billing** button affects every currently due subscription, so review the reported failures and server log after a run.
 
 Password reset uses SMTP when configured. In local development without SMTP, the reset link is logged by the server and returned to the browser as a development link.
+
+Invoice email requires `SMTP_HOST` and a suitable `MAIL_FROM` in `.env`. Without SMTP, the **Email customer** action returns an error and does not log invoice data. It sends a secure portal link, not a PDF attachment. Customers must sign in to open the link; the API checks invoice ownership.
 
 ## Checks
 
@@ -122,7 +125,7 @@ npm.cmd run test:subscriptions
 npm.cmd run test:billing
 ```
 
-These scripts create test records in the configured database, so use a local test or demo database. The billing suite covers its daily invoice path; weekly, monthly, yearly, concurrent-run, and large-dataset cases still need broader verification.
+The API acceptance scripts create test records in the configured database, so use a local test or demo database. `test:finance:unit` and `test:billing:unit` run without a database after building the server. The billing unit check covers interval date math; the live billing suite covers its daily invoice path. Weekly, monthly, yearly, concurrent-run, and large-dataset invoice cases still need broader verification.
 
 The checks below do not require the running API:
 
@@ -130,6 +133,8 @@ The checks below do not require the running API:
 # From server/
 npm.cmd run typecheck
 npm.cmd run build
+npm.cmd run test:finance:unit
+npm.cmd run test:billing:unit
 
 # From client/
 npm.cmd run test:api

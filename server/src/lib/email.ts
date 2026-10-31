@@ -64,3 +64,27 @@ export async function sendPasswordResetEmail(to: string, rawToken: string): Prom
 
   return { delivered: true };
 }
+
+/** Sends an issued invoice link. No development fallback sends or logs customer invoice data. */
+export async function sendInvoiceEmail(input: {
+  to: string;
+  invoiceId: number;
+  invoiceNumber: string;
+  currencyCode: string;
+  grandTotal: string;
+  dueDate: string;
+  status: "CONFIRMED" | "PAID";
+}): Promise<boolean> {
+  const transport = getTransport();
+  if (!transport) return false;
+  const link = new URL(`/portal?tab=invoices&open=${input.invoiceId}`, env.APP_URL).toString();
+  await transport.sendMail({
+    from: env.MAIL_FROM ?? "no-reply@subscriptions.local",
+    to: input.to,
+    subject: `Invoice ${input.invoiceNumber} — Subscriptions`,
+    text: `Invoice ${input.invoiceNumber} is available in your Subscriptions portal.\n\n`
+      + `Status: ${input.status}\nTotal: ${input.currencyCode} ${input.grandTotal}\nDue date: ${input.dueDate}\n\n`
+      + `View and print your invoice after signing in: ${link}\n`,
+  });
+  return true;
+}

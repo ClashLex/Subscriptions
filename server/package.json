@@ -45,6 +45,8 @@
     "test:catalogue": "node --env-file=../.env scripts/test-catalogue.mjs",
     "test:subscriptions": "node --env-file=../.env scripts/test-subscriptions.mjs",
     "test:billing": "node --env-file=../.env scripts/test-billing.mjs",
+    "test:finance:unit": "npm run build && node scripts/test-finance-summary.mjs",
+    "test:billing:unit": "npm run build && node scripts/test-billing-dates.mjs",
     "debugfetch": "node --env-file=../.env scripts/debug-fetch.mjs"
   }
 }

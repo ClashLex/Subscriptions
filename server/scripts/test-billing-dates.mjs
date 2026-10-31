@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { addIntervalIso } from "../dist/src/lib/dates.js";
+
+assert.equal(addIntervalIso("2024-02-28", "DAY", 1), "2024-02-29");
+assert.equal(addIntervalIso("2025-12-29", "WEEK", 1), "2026-01-05");
+assert.equal(addIntervalIso("2024-01-31", "MONTH", 1), "2024-02-29");
+assert.equal(addIntervalIso("2025-01-31", "MONTH", 1), "2025-02-28");
+assert.equal(addIntervalIso("2025-11-30", "MONTH", 2), "2026-01-30");
+assert.equal(addIntervalIso("2024-02-29", "YEAR", 1), "2025-02-28");
+assert.equal(addIntervalIso("2024-02-29", "YEAR", 4), "2028-02-29");
+console.log("Billing interval date checks passed.");

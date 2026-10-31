@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { SessionProvider, useSession } from "./state/session.js";
 import { PageLoader } from "./ui/components.js";
 import { AdminLayout } from "./pages/AdminLayout.js";
@@ -16,16 +16,18 @@ import { SubscriptionsPage } from "./pages/admin/SubscriptionsPage.js";
 import { InvoicesPage } from "./pages/admin/InvoicesPage.js";
 import { PaymentsPage } from "./pages/admin/PaymentsPage.js";
 import { DiscountsPage } from "./pages/admin/DiscountsPage.js";
+import { InvoicePrintPage } from "./pages/InvoicePrintPage.js";
 import type { ReactNode } from "react";
 import type { Role } from "./lib/types.js";
 
 function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }) {
   const session = useSession();
+  const location = useLocation();
   if (session.status === "loading") {
     return <PageLoader label={"Checking your session\u2026"} />;
   }
   if (session.user === null) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
   if (!roles.includes(session.user.role)) {
     return <Navigate to="/" replace />;
@@ -82,6 +84,10 @@ export default function App() {
                 <PortalPage />
               </RequireRole>
             }
+          />
+          <Route
+            path="/invoices/:id/print"
+            element={<RequireRole roles={["ADMIN", "STAFF", "CUSTOMER"]}><InvoicePrintPage /></RequireRole>}
           />
           <Route
             path="/login"

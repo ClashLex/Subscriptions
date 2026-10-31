@@ -43,6 +43,10 @@ async function req(method, path, { body } = {}) {
 }
 
 const show = (value) => JSON.stringify(value);
+function minor(value) {
+  const [whole, fraction = ""] = value.split(".");
+  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, "0"));
+}
 let failures = 0;
 async function step(name, work) {
   try {
@@ -180,6 +184,8 @@ await step("billing creates one discounted, taxed invoice and rounds tiny tax co
   const notOverdue = await req("GET", "/invoices?overdueOnly=false&pageSize=100");
   assert.equal(notOverdue.status, 200, show(notOverdue));
   assert.ok(notOverdue.json?.meta?.total >= 2, show(notOverdue));
+  const sendDraft = await req("POST", `/invoices/${invoiceId}/send`, { body: {} });
+  assert.equal(sendDraft.status, 409, show(sendDraft));
 
   const discountList = await req("GET", "/discounts");
   const discount = discountList.json?.data?.find((item) => item.name === `Billing discount ${run}`);
@@ -194,6 +200,28 @@ await step("repeated billing run does not duplicate or re-advance periods", asyn
   const list = await req("GET", `/invoices?subscriptionId=${subscriptionId}&pageSize=100`);
   assert.equal(list.status, 200, show(list));
   assert.equal(list.json?.data?.length, 1, show(list));
+});
+
+await step("customers cannot see draft invoices or finance totals", async () => {
+  jar.clear();
+  try {
+    const login = await req("POST", "/auth/login", {
+      body: { email: `billing.${run}@demo.test`, password: "Billing-Pass1!" },
+    });
+    assert.equal(login.status, 200, show(login));
+    const draft = await req("GET", `/invoices/${invoiceId}`);
+    assert.equal(draft.status, 404, show(draft));
+    const list = await req("GET", "/invoices?status=DRAFT");
+    assert.equal(list.status, 200, show(list));
+    assert.equal(list.json?.meta?.total, 0, show(list));
+    const finance = await req("GET", `/finance/summary?from=${today}&to=${today}`);
+    assert.equal(finance.status, 403, show(finance));
+    const send = await req("POST", `/invoices/${invoiceId}/send`, { body: {} });
+    assert.equal(send.status, 403, show(send));
+  } finally {
+    jar.clear();
+    assert.equal((await req("POST", "/auth/login", { body: admin })).status, 200);
+  }
 });
 
 await step("draft invoice cancellation is reflected in invoice status", async () => {
@@ -239,6 +267,14 @@ await step("invoice confirmation, partial payment, overpayment rejection, and pa
   assert.equal(payments.json?.data?.length, 2, show(payments));
   assert.equal(payments.json?.meta?.total, 2, show(payments));
 
+  const finance = await req("GET", `/finance/summary?from=${today}&to=${today}`);
+  assert.equal(finance.status, 200, show(finance));
+  assert.ok(finance.json?.data?.activeSubscriptions >= 1, show(finance));
+  const inr = finance.json?.data?.currencies?.find((row) => row.currencyCode === "INR");
+  assert.ok(inr, show(finance));
+  assert.ok(minor(inr.invoiced) >= 10030n, show(finance));
+  assert.ok(minor(inr.received) >= 10030n, show(finance));
+
   jar.clear();
   const customerLogin = await req("POST", "/auth/login", {
     body: { email: `billing.${run}@demo.test`, password: "Billing-Pass1!" },
@@ -247,6 +283,8 @@ await step("invoice confirmation, partial payment, overpayment rejection, and pa
   const ownInvoice = await req("GET", `/invoices/${invoiceId}`);
   assert.equal(ownInvoice.status, 200, show(ownInvoice));
   assert.equal(ownInvoice.json?.data?.customerId, customerId);
+  const cancelledDraft = await req("GET", `/invoices/${tinyInvoiceId}`);
+  assert.equal(cancelledDraft.status, 404, show(cancelledDraft));
 });
 
 await step("open-ended contract bills every due period (regression: one invoice only)", async () => {

@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import { AppError, asyncHandler } from "../../middleware/errors.js";
+import { execute } from "../../config/db.js";
+import { sendInvoiceEmail } from "../../lib/email.js";
 import { requireAuth, requireStaffOrAdmin } from "../auth/auth.middleware.js";
 import {
   invoiceActionSchema,
@@ -55,6 +57,7 @@ invoicesRouter.get(
       customerId: customerIdFor(role, req.session.userId as number, q.customerId),
       subscriptionId: q.subscriptionId,
       overdueOnly: q.overdueOnly && !isCustomer(role) ? true : undefined,
+      issuedOnly: isCustomer(role),
       issuedFrom: q.issuedFrom,
       issuedTo: q.issuedTo,
     });
@@ -73,7 +76,7 @@ invoicesRouter.get(
     if (detail === null) {
       throw new AppError(404, "INVOICE_NOT_FOUND", `Invoice ${id} does not exist.`);
     }
-    if (isCustomer(req.session.role) && detail.customerId !== req.session.userId) {
+    if (isCustomer(req.session.role) && (detail.customerId !== req.session.userId || detail.confirmedAt === null)) {
       // Foreign invoices are invisible, not simply forbidden.
       throw new AppError(404, "INVOICE_NOT_FOUND", `Invoice ${id} does not exist.`);
     }
@@ -83,6 +86,36 @@ invoicesRouter.get(
 
 // Admin/Staff actions from here down.
 invoicesRouter.use(requireStaffOrAdmin);
+
+invoicesRouter.post(
+  "/:id/send",
+  asyncHandler(async (req, res) => {
+    const id = idParam.parse(req.params.id);
+    const detail = await getInvoiceDetail(id);
+    if (detail === null) throw new AppError(404, "INVOICE_NOT_FOUND", `Invoice ${id} does not exist.`);
+    if (detail.status !== "CONFIRMED" && detail.status !== "PAID") {
+      throw new AppError(409, "INVOICE_NOT_ISSUED", "Confirm the invoice before sending it.");
+    }
+    if (!detail.customerEmail) throw new AppError(409, "CUSTOMER_EMAIL_MISSING", "This customer has no email address.");
+    const delivered = await sendInvoiceEmail({
+      to: detail.customerEmail,
+      invoiceId: detail.id,
+      invoiceNumber: detail.invoiceNumber,
+      currencyCode: detail.currencyCode,
+      grandTotal: detail.grandTotal,
+      dueDate: detail.dueDate,
+      status: detail.status,
+    });
+    if (!delivered) throw new AppError(503, "EMAIL_NOT_CONFIGURED", "Configure SMTP before sending invoice email.");
+    try {
+      await execute("INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id) VALUES (?, 'INVOICE_SENT', 'INVOICE', ?)", [req.session.userId, id]);
+    } catch (error) {
+      // Delivery already happened; do not report failure and invite an accidental resend.
+      console.error(`[invoice] delivery audit failed for ${id}:`, error);
+    }
+    res.status(200).json({ data: { delivered: true, to: detail.customerEmail } });
+  }),
+);
 
 invoicesRouter.post(
   "/:id/confirm",

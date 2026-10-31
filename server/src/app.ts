@@ -16,6 +16,7 @@ import { subscriptionsRouter } from "./modules/subscriptions/subscriptions.route
 import { billingRouter } from "./modules/billing/billing.routes.js";
 import { discountsRouter } from "./modules/discounts/discounts.routes.js";
 import { invoicesRouter, paymentsRouter } from "./modules/invoices/invoices.routes.js";
+import { financeRouter } from "./modules/finance/finance.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/errors.js";
 
 const MySQLStore = MySQLStoreFactory(session);
@@ -79,6 +80,7 @@ export function createApp(): Express {
   app.use("/api/v1/discounts", discountsRouter);
   app.use("/api/v1/invoices", invoicesRouter);
   app.use("/api/v1/payments", paymentsRouter);
+  app.use("/api/v1/finance", financeRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

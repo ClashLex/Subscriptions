@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ApiError, asApiError, formatMoney, list, request, type PageMeta } from "../../lib/api.js";
 import type { BillingRunResult, InvoiceDetail, InvoiceListItem, InvoiceStatus } from "../../lib/types.js";
 import { useSession } from "../../state/session.js";
@@ -35,6 +35,8 @@ export function InvoicesPage() {
   const [detailError, setDetailError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [runResult, setRunResult] = useState<BillingRunResult | null>(null);
   const [payment, setPayment] = useState({ method: "", amount: "", paidAt: "", reference: "", note: "" });
   const detailRequest = useRef(0);
@@ -65,6 +67,7 @@ export function InvoicesPage() {
     setSelectedId(id);
     setDetail(null);
     setDetailError(null);
+    setSentTo(null);
     setDetailLoading(true);
     try {
       const result = await request<InvoiceDetail>(`/invoices/${id}`);
@@ -117,6 +120,21 @@ export function InvoicesPage() {
     }
   }
 
+  async function sendInvoice() {
+    if (!detail || sending) return;
+    setSending(true);
+    setDetailError(null);
+    setSentTo(null);
+    try {
+      const result = await request<{ delivered: boolean; to: string }>(`/invoices/${detail.id}/send`, { method: "POST" });
+      if (result.delivered) setSentTo(result.to);
+    } catch (caught) {
+      setDetailError(asApiError(caught));
+    } finally {
+      setSending(false);
+    }
+  }
+
   function recordPayment(event: FormEvent) {
     event.preventDefault();
     if (!detail || busy) return;
@@ -161,8 +179,9 @@ export function InvoicesPage() {
     <Modal open={selectedId !== null} title={detail?.invoiceNumber ?? "Invoice"} onClose={() => { if (!busy) { detailRequest.current += 1; setSelectedId(null); setDetail(null); } }} wide>
       {detailLoading ? <p className="text-sm text-slate-500">Loading invoice…</p> : null}
       <ErrorBanner error={detailError} />
+      {sentTo ? <p className="mb-3 rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-700">Invoice email sent to {sentTo}.</p> : null}
       {detail ? <div className="space-y-5 text-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div>{statusBadge(detail.status)} {detail.ledger.overdue ? <Badge tone="red">Overdue</Badge> : detail.ledger.partiallyPaid ? <Badge tone="amber">Partially paid</Badge> : null}</div><div className="flex gap-2">{detail.status === "DRAFT" ? <Button disabled={busy} onClick={() => void mutate(`/invoices/${detail.id}/confirm`)}>Confirm invoice</Button> : null}{(detail.status === "DRAFT" || detail.status === "CONFIRMED") && detail.payments.length === 0 ? <Button variant="danger" disabled={busy} onClick={() => { const reason = window.prompt("Reason for cancellation (optional)"); if (reason !== null) void mutate(`/invoices/${detail.id}/cancel`, { reason: reason.trim() }); }}>Cancel invoice</Button> : null}</div></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div>{statusBadge(detail.status)} {detail.ledger.overdue ? <Badge tone="red">Overdue</Badge> : detail.ledger.partiallyPaid ? <Badge tone="amber">Partially paid</Badge> : null}</div><div className="flex flex-wrap gap-2"><Link className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100" to={`/invoices/${detail.id}/print`} target="_blank" rel="noopener noreferrer">Print / save PDF</Link>{(detail.status === "CONFIRMED" || detail.status === "PAID") ? <Button variant="secondary" disabled={sending || busy} onClick={() => void sendInvoice()}>{sending ? "Sending…" : "Email customer"}</Button> : null}{detail.status === "DRAFT" ? <Button disabled={busy} onClick={() => void mutate(`/invoices/${detail.id}/confirm`)}>Confirm invoice</Button> : null}{(detail.status === "DRAFT" || detail.status === "CONFIRMED") && detail.payments.length === 0 ? <Button variant="danger" disabled={busy} onClick={() => { const reason = window.prompt("Reason for cancellation (optional)"); if (reason !== null) void mutate(`/invoices/${detail.id}/cancel`, { reason: reason.trim() }); }}>Cancel invoice</Button> : null}</div></div>
         <div className="grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-2"><p><strong>Customer:</strong> {detail.customerEmail}</p><p><strong>Subscription:</strong> {detail.subscriptionNumber}</p><p><strong>Period:</strong> {detail.periodStart} – {detail.periodEnd}</p><p><strong>Issued / due:</strong> {detail.issueDate} / {detail.dueDate}</p></div>
         <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs uppercase text-slate-500"><th className="py-2">Line</th><th>Qty × unit</th><th>Discount</th><th>Tax</th><th className="text-right">Total</th></tr></thead><tbody>{detail.lines.map((line) => <tr key={line.id} className="border-b"><td className="py-2">{line.description}</td><td>{line.quantity} × {formatMoney(line.unitPrice)}</td><td>{formatMoney(line.discountAmount)}{line.discountRuleId ? ` (#${line.discountRuleId})` : ""}</td><td>{line.taxName ?? "—"} {formatMoney(line.taxAmount)}</td><td className="text-right">{formatMoney(line.lineTotal)}</td></tr>)}</tbody></table></div>
         <div className="grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-3"><p>Subtotal <strong>{formatMoney(detail.subtotal)}</strong></p><p>Discount <strong>{formatMoney(detail.discountTotal)}</strong></p><p>Tax <strong>{formatMoney(detail.taxTotal)}</strong></p><p>Grand total <strong>{formatMoney(detail.grandTotal)}</strong></p><p>Paid <strong>{formatMoney(detail.ledger.paidTotal)}</strong></p><p>Outstanding <strong>{formatMoney(detail.ledger.outstanding)}</strong></p></div>

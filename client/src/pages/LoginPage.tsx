@@ -27,7 +27,10 @@ export function LoginPage() {
     setError(null);
     try {
       const user = await session.login(email.trim(), password);
-      navigate(homeFor(user.role), { replace: true });
+      const next = new URLSearchParams(location.search).get("next");
+      const destination = next !== null && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\")
+        ? next : homeFor(user.role);
+      navigate(destination, { replace: true });
     } catch (caught) {
       setError(asApiError(caught));
     } finally {

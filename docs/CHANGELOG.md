@@ -6,6 +6,24 @@ All notable project, documentation, and implementation changes should be recorde
 
 ## [Unreleased]
 
+### Added — 2026-10-31 (invoice delivery and print)
+
+- Added a role-checked printable invoice page with a browser Print / Save as PDF action. Unauthenticated users return to the requested page after signing in.
+- Added Staff/Admin `POST /api/v1/invoices/:id/send` for confirmed or paid invoices. It sends a plain-text portal link by configured SMTP, returns an explicit error when SMTP is absent, and records a best-effort delivery audit after a successful send. No email or PDF attachment was sent during this implementation.
+- Extended the billing acceptance script with customer draft-invoice visibility, finance-role, and finance-total assertions. Added a database-free test of currency aggregation. The client build, server build, unit check, and acceptance-script syntax check pass; live SMTP/browser/database paths remain unverified here.
+- Added deterministic daily, weekly, month-end, and leap-year interval unit checks. Repeated multi-period billing still needs live acceptance coverage.
+
+### Added — 2026-10-31 (customer billing portal)
+
+- Added paginated customer subscription, invoice, and payment views. Invoice detail shows line snapshots, tax, discount, balance, and payment history; invoice links can open a specific detail view.
+- Customer invoice reads now hide invoices that were never confirmed, including drafts cancelled before confirmation. Existing customer ownership checks still apply.
+- Client build and server typecheck pass. Live portal role and database checks remain pending in this shell.
+
+### Added — 2026-10-31 (finance summary)
+
+- Added Staff/Admin `GET /api/v1/finance/summary` and a dated finance overview. SQL aggregates report active subscriptions, confirmed or paid invoice totals in the period, successful payments in the period, and current outstanding and overdue balances, grouped by currency.
+- Client build and server typecheck pass. Live database totals have not yet been checked in this shell.
+
 ### Added — 2026-10-31 (billing and finance browser workflow)
 
 - Added Admin and Staff invoice screens with filters, invoice line/ledger detail, confirmation, eligible cancellation, and payment recording. The Admin-only billing control reports created, skipped, auto-closed, and failed work.

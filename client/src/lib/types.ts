@@ -295,3 +295,16 @@ export interface DiscountRule {
   createdBy: number | null;
   createdAt: string;
 }
+
+export interface FinanceSummary {
+  period: { from: string; to: string };
+  asOf: string;
+  activeSubscriptions: number;
+  currencies: Array<{
+    currencyCode: string;
+    invoiced: string;
+    received: string;
+    outstanding: string;
+    overdue: string;
+  }>;
+}

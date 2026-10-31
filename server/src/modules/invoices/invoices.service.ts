@@ -154,11 +154,15 @@ export async function listInvoices(options: {
   customerId?: number;
   subscriptionId?: number;
   overdueOnly?: boolean;
+  issuedOnly?: boolean;
   issuedFrom?: string;
   issuedTo?: string;
 }): Promise<{ rows: Array<ReturnType<typeof listRowDto>>; total: number }> {
   const conditions: string[] = [];
   const params: unknown[] = [];
+  if (options.issuedOnly) {
+    conditions.push("i.confirmed_at IS NOT NULL");
+  }
   if (options.status !== undefined) {
     conditions.push("i.status = ?");
     params.push(options.status);
