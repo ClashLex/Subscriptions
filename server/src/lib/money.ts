@@ -56,7 +56,7 @@ export function percentOf(value: string, rate: string): string {
   const rounded =
     remainder === 0n
       ? quarter
-      : absRemainder * 5n >= 5000n
+      : absRemainder >= 5000n
         ? quarter + sign
         : quarter;
   return fromCents(rounded);

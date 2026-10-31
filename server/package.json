@@ -45,6 +45,7 @@
     "test:auth": "node --env-file=../.env scripts/test-auth.mjs",
     "test:catalogue": "node --env-file=../.env scripts/test-catalogue.mjs",
     "test:subscriptions": "node --env-file=../.env scripts/test-subscriptions.mjs",
+    "test:billing": "node --env-file=../.env scripts/test-billing.mjs",
     "debugfetch": "node --env-file=../.env scripts/debug-fetch.mjs"
   }
 }
