@@ -18,8 +18,11 @@ usersRouter.get(
     const limit = Math.min(Number(req.query.pageSize ?? 25) || 25, 100);
     const page = Math.max(Number(req.query.page ?? 1) || 1, 1);
     const offset = (page - 1) * limit;
-    const users = await listUsers(limit, offset);
-    res.status(200).json({ data: users, meta: { page, pageSize: limit } });
+    const { rows, total } = await listUsers(limit, offset);
+    res.status(200).json({
+      data: rows,
+      meta: { page, pageSize: limit, total, totalPages: Math.ceil(total / limit) || 1 },
+    });
   }),
 );
 

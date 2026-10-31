@@ -1,3 +1,4 @@
+import type { PoolConnection } from "mysql2/promise";
 import { RowDataPacket } from "mysql2/promise";
 import { query, execute, withTransaction } from "../../config/db.js";
 
@@ -84,6 +85,23 @@ export async function createPasswordResetToken(
   });
 }
 
+/**
+ * Deletes every stored session whose JSON payload belongs to this user.
+ * Used after password resets and account deactivation so invalidated users
+ * cannot keep using an old cookie (SECURITY_AND_ACCESS.md §3, §4).
+ */
+export async function revokeUserSessionsWithConnection(
+  connection: PoolConnection,
+  userId: number,
+): Promise<void> {
+  const pattern = `%"userId":${userId},%`;
+  const patternEnd = `%"userId":${userId}}%`;
+  await connection.execute("DELETE FROM sessions WHERE data LIKE ? OR data LIKE ?", [
+    pattern,
+    patternEnd,
+  ]);
+}
+
 export interface ResetTokenRow extends RowDataPacket {
   id: number;
   user_id: number;
@@ -127,12 +145,7 @@ export async function completePasswordReset(
       [userId],
     );
     // Server-side sessions table rows embed the user id in their JSON payload.
-    const pattern = `%"userId":${userId},%`;
-    const patternEnd = `%"userId":${userId}}%`;
-    await connection.execute(
-      "DELETE FROM sessions WHERE data LIKE ? OR data LIKE ?",
-      [pattern, patternEnd],
-    );
+    await revokeUserSessionsWithConnection(connection, userId);
   });
 }
 

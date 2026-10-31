@@ -5,15 +5,11 @@ import {
   hashToken,
   sendPasswordResetEmail,
 } from "../../lib/email.js";
-import {
-  forgotPasswordSchema,
-  loginSchema,
-  registerSchema,
-  resetPasswordSchema,
-  type ForgotPasswordDto,
-  type LoginDto,
-  type RegisterDto,
-  type ResetPasswordDto,
+import type {
+  ForgotPasswordDto,
+  LoginDto,
+  RegisterDto,
+  ResetPasswordDto,
 } from "./auth.schemas.js";
 import {
   completePasswordReset,
@@ -35,7 +31,6 @@ function duplicateOrNull(error: unknown): boolean {
 
 /** Customer registration: unique normalized email, policy-checked password. */
 export async function register(dto: RegisterDto): Promise<PublicUser> {
-  registerSchema.parse(dto);
   const existing = await findUserByEmail(dto.email);
   if (existing) {
     throw new AppError(409, "EMAIL_TAKEN", "An account with that email already exists.");
@@ -63,7 +58,6 @@ export async function register(dto: RegisterDto): Promise<PublicUser> {
 
 /** Login: generic failures never reveal which check failed. */
 export async function login(dto: LoginDto): Promise<PublicUser> {
-  loginSchema.parse(dto);
   const user = await findUserByEmail(dto.email);
   if (!user) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Email or password is incorrect.");
@@ -86,7 +80,6 @@ export interface ForgotPasswordResult {
  * development (documented development fallback, REQUIREMENTS.md §4).
  */
 export async function forgotPassword(dto: ForgotPasswordDto): Promise<ForgotPasswordResult> {
-  forgotPasswordSchema.parse(dto);
   const user = await findUserByEmail(dto.email);
   let devUrl: string | undefined;
 
@@ -105,7 +98,6 @@ export async function forgotPassword(dto: ForgotPasswordDto): Promise<ForgotPass
 
 /** Validates the one-time token and applies the new password atomically. */
 export async function resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
-  resetPasswordSchema.parse(dto);
   const token = await findUsableResetToken(hashToken(dto.token));
   if (!token) {
     throw new AppError(400, "INVALID_RESET_TOKEN", "Reset link is invalid or has expired.");

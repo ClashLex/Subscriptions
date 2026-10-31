@@ -64,6 +64,8 @@ const customerB = { email: `cust.b.${run}@demo.test`, password: "An0ther-Secret!
 const staffUser = { email: `staff.${run}@demo.test`, password: "St4ff-Passphrase!", displayName: `Staff ${run}` };
 const admin = { email: process.env.SEED_ADMIN_EMAIL, password: process.env.SEED_ADMIN_PASSWORD };
 const newPassword = "R3freshed-Passphrase!";
+let staffSid;
+let adminSid;
 
 await step("health check is ready", async () => {
   jar.clear();
@@ -182,6 +184,7 @@ await step("Staff can log in", async () => {
   assert.equal(r.status, 200, P(r));
   const me = await req("GET", "/auth/me");
   assert.equal(me.json?.data?.user?.role, "STAFF");
+  staffSid = jar.get("subscriptions.sid");
 });
 
 await step("Staff cannot deactivate accounts (403)", async () => {
@@ -193,6 +196,7 @@ await step("Admin re-login for status changes", async () => {
   jar.clear();
   const r = await req("POST", "/auth/login", { body: admin });
   assert.equal(r.status, 200, P(r));
+  adminSid = jar.get("subscriptions.sid");
 });
 
 await step("Admin deactivates staff → 200; deactivated staff loses access", async () => {
@@ -201,6 +205,10 @@ await step("Admin deactivates staff → 200; deactivated staff loses access", as
   // Verify the deactivated account cannot authenticate (keeps admin cookies).
   const adminCookies = new Map(jar);
   jar.clear();
+  // Prove immediate revocation: yesterday's still-valid staff cookie is dead.
+  jar.set("subscriptions.sid", staffSid ?? "");
+  const revokedMe = await req("GET", "/auth/me");
+  assert.equal(revokedMe.status, 401, P(revokedMe));
   const staffLogin = await req("POST", "/auth/login", {
     body: { email: staffUser.email, password: staffUser.password },
   });
