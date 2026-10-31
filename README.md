@@ -10,14 +10,14 @@ The application is under active development. The table separates features availa
 
 | Area | Available now |
 |---|---|
-| Browser | Sign in, customer registration and password reset; Admin and Staff catalogue, tax, plan, quotation template, and subscription screens; customer subscription list. |
+| Browser | Sign in, customer registration and password reset; Admin and Staff catalogue, tax, plan, quotation template, subscription, invoice, payment, and discount screens; customer subscription list. |
 | API | Authentication and roles; customer directory; catalogue and plans; quotation and subscription lifecycle; discount rules; recurring invoice generation; invoice reads and confirmation/cancellation; payment recording and reads. |
-| Billing trigger | Admin-only `POST /api/v1/billing/run`, or an optional in-process scheduler. The scheduler is disabled by default. |
-| Still to build | Invoice and payment screens, an Admin billing control, invoice email/PDF, finance dashboard, and fuller customer billing views. |
+| Billing trigger | Admin-only **Run billing** control on the invoice screen, `POST /api/v1/billing/run`, or an optional in-process scheduler. The scheduler is disabled by default. |
+| Still to build | Invoice email/PDF, finance dashboard, and customer invoice/payment screens. |
 
-The main workflow is: configure a product and plan, create a customer subscription, submit and confirm its quotation, activate it, generate an invoice when due, confirm the invoice, and record payments. Billing and payment actions currently require an API client; the browser does not yet expose those controls.
+The main workflow is: configure a product and plan, create a customer subscription, submit and confirm its quotation, activate it, run billing when due, confirm the invoice, and record payments. Admins run billing from **Invoices & billing**. Admins and Staff can review invoices, confirm or cancel eligible invoices, record payments, and search payment history. Admins create, edit, activate, and deactivate discount rules; Staff can read active rules.
 
-**Pricing rule today:** invoice amounts come from the subscription's snapshotted product lines. The plan's `price` is displayed in the UI but does not determine the invoice total.
+**Pricing rule:** a plan's `price` is a catalogue reference amount. Recurring invoice amounts come from the subscription's snapshotted product lines, followed by eligible discounts and taxes. The plan price does not add a fee or replace line prices. The plan and subscription screens label it as a reference price.
 
 ## Technology
 
@@ -91,12 +91,23 @@ For a compiled API run, execute `npm.cmd run build` and then `npm.cmd run start`
 | Role | Main access |
 |---|---|
 | Admin | Configure products, variants, taxes, and plans; manage users; run billing; manage subscriptions and finance records. |
-| Staff | Read catalogue configuration; create and edit quotation templates and subscriptions; confirm invoices and record payments through the API. |
+| Staff | Read catalogue configuration and active discounts; create and edit quotation templates and subscriptions; review, confirm, or cancel eligible invoices and record payments in the browser. |
 | Customer | Register and sign in; see their own subscriptions in the portal and their own invoices/payments through the API. |
 
 Subscriptions follow **Draft → Quotation → Confirmed → Active**. Active subscriptions may be paused, resumed, closed, or renewed according to plan policy. Invoice generation snapshots line prices, tax, and any eligible discount. A unique database key prevents duplicate invoices for the same subscription period. Payments can cover part or all of a confirmed invoice; overpayments are rejected.
 
 The optional scheduler uses `BILLING_RUN_INTERVAL_MINUTES` in `.env`. A positive value starts periodic runs after the configured interval. Leave it blank or set it to `0` to use only the Admin API trigger. The scheduler has not yet been verified in a live deployment.
+
+### Billing in the browser
+
+1. Sign in as Admin. In **Plans**, set the billing interval and a reference price. In **Products & variants**, set sale prices. Create a quotation template or add priced product lines when creating a subscription.
+2. In **Subscriptions**, complete the quotation and activate the subscription. Its line prices are the recurring billing basis.
+3. Optionally create a rule in **Discounts**. Choose a fixed amount or percentage, a whole subscription or selected products, and any minimums, date window, or usage limit. Only Admins can change rules.
+4. When an active subscription is due, open **Invoices & billing** and select **Run billing** as Admin. The screen reports how many subscriptions were scanned, invoiced, skipped, closed, or failed. Billing also runs automatically if the optional scheduler is enabled.
+5. Filter and open an invoice to review its line, discount, tax, total, payment, and outstanding-balance snapshots. Confirm a draft invoice before collecting payment. Eligible draft or unpaid confirmed invoices can be cancelled.
+6. Record a partial or full payment on a confirmed invoice. Use **Payments** for history and a link back to the invoice. The server rejects overpayments and updates the invoice to paid when its balance reaches zero.
+
+Billing is repeat-safe for an already invoiced subscription period. The browser's **Run billing** button affects every currently due subscription, so review the reported failures and server log after a run.
 
 Password reset uses SMTP when configured. In local development without SMTP, the reset link is logged by the server and returned to the browser as a development link.
 
@@ -126,7 +137,7 @@ npm.cmd run lint
 npm.cmd run build
 ```
 
-The latest local pre-push review passed these static checks. The live API suites were not rerun in that environment because MySQL and the API were unavailable. The [changelog](docs/CHANGELOG.md) records test evidence and remaining gaps.
+The [changelog](docs/CHANGELOG.md) records verification evidence and remaining gaps. Live API acceptance scripts need a running MySQL server and API.
 
 ## Repository map
 

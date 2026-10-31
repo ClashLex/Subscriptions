@@ -13,6 +13,9 @@ import { PlansPage } from "./pages/admin/PlansPage.js";
 import { TaxesPage } from "./pages/admin/TaxesPage.js";
 import { TemplatesPage } from "./pages/admin/QuotationTemplatesPage.js";
 import { SubscriptionsPage } from "./pages/admin/SubscriptionsPage.js";
+import { InvoicesPage } from "./pages/admin/InvoicesPage.js";
+import { PaymentsPage } from "./pages/admin/PaymentsPage.js";
+import { DiscountsPage } from "./pages/admin/DiscountsPage.js";
 import type { ReactNode } from "react";
 import type { Role } from "./lib/types.js";
 
@@ -68,6 +71,9 @@ export default function App() {
             <Route path="/admin/taxes" element={<TaxesPage />} />
             <Route path="/admin/templates" element={<TemplatesPage />} />
             <Route path="/admin/subscriptions" element={<SubscriptionsPage />} />
+            <Route path="/admin/invoices" element={<InvoicesPage />} />
+            <Route path="/admin/payments" element={<PaymentsPage />} />
+            <Route path="/admin/discounts" element={<DiscountsPage />} />
           </Route>
           <Route
             path="/portal"

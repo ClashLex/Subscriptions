@@ -6,6 +6,18 @@ All notable project, documentation, and implementation changes should be recorde
 
 ## [Unreleased]
 
+### Added — 2026-10-31 (billing and finance browser workflow)
+
+- Added Admin and Staff invoice screens with filters, invoice line/ledger detail, confirmation, eligible cancellation, and payment recording. The Admin-only billing control reports created, skipped, auto-closed, and failed work.
+- Added a paginated payment history screen with filters and invoice links. Added discount rule management: Admins can create, edit, activate, and deactivate rules; Staff see active rules read-only. Product-scoped rules support paginated product selection.
+- Clarified in the plan and subscription screens that plan price is a catalogue reference amount. Recurring invoices continue to bill snapshotted subscription line prices with applicable discounts and taxes. This is the agreed pricing rule.
+- Updated the README with the browser billing workflow and current feature status.
+
+### Verification — 2026-10-31 (billing and finance browser workflow)
+
+- Client production build, lint, and API response helper checks pass; server typecheck/build and staged whitespace checks pass. Lint retains existing React warnings and reports the same effect-pattern warning in the new pages.
+- Live invoice, payment, discount, and billing flows need a running MySQL server and API for browser acceptance verification in this shell.
+
 ### Documentation — 2026-10-31 (Git tracking convention)
 
 - Git now tracks only the root README and `docs/CHANGELOG.md` among Markdown files. Other `docs/*.md` files remain on disk locally but are removed from Git's index and ignored for future commits.

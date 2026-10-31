@@ -10,6 +10,9 @@ const NAV_ITEMS: Array<{ to: string; label: string }> = [
   { to: "/admin/taxes", label: "Taxes" },
   { to: "/admin/templates", label: "Quotation templates" },
   { to: "/admin/subscriptions", label: "Subscriptions" },
+  { to: "/admin/invoices", label: "Invoices & billing" },
+  { to: "/admin/payments", label: "Payments" },
+  { to: "/admin/discounts", label: "Discounts" },
 ];
 
 export function AdminLayout() {
@@ -30,7 +33,7 @@ export function AdminLayout() {
             </Button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-6xl gap-1 px-4">
+        <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}

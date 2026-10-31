@@ -344,11 +344,12 @@ function SubscriptionCreator({
               <option value="">Choose a plan…</option>
               {plans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
-                  {plan.name} — {formatMoney(plan.price)} / {intervalLabel(plan.billingIntervalUnit, plan.billingIntervalCount)}
+                  {plan.name} — reference {formatMoney(plan.price)} / {intervalLabel(plan.billingIntervalUnit, plan.billingIntervalCount)}
                 </option>
               ))}
             </Select>
           </Field>
+          <p className="text-xs text-slate-500">Recurring invoices use the subscription line prices, with eligible discounts and taxes.</p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Field label="Start date (today if blank)">
