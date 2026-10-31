@@ -17,7 +17,7 @@ The application is under active development. The table separates features availa
 
 The main workflow is: configure a product and plan, create a customer subscription, submit and confirm its quotation, activate it, generate an invoice when due, confirm the invoice, and record payments. Billing and payment actions currently require an API client; the browser does not yet expose those controls.
 
-**Pricing rule today:** invoice amounts come from the subscription's snapshotted product lines. The plan's `price` is displayed in the UI but does not determine the invoice total. See [billing decisions](docs/BILLING_AND_FINANCE.md) before changing this behavior.
+**Pricing rule today:** invoice amounts come from the subscription's snapshotted product lines. The plan's `price` is displayed in the UI but does not determine the invoice total.
 
 ## Technology
 
@@ -126,7 +126,7 @@ npm.cmd run lint
 npm.cmd run build
 ```
 
-The latest local pre-push review passed these static checks. The live API suites were not rerun in that environment because MySQL and the API were unavailable. See the [test plan](docs/TEST_PLAN.md) for recorded evidence and open cases.
+The latest local pre-push review passed these static checks. The live API suites were not rerun in that environment because MySQL and the API were unavailable. The [changelog](docs/CHANGELOG.md) records test evidence and remaining gaps.
 
 ## Repository map
 
@@ -138,6 +138,8 @@ The latest local pre-push review passed these static checks. The live API suites
 | `server/src/jobs/` | Optional billing scheduler. |
 | `server/migrations/` | Ordered MySQL schema changes. |
 | `server/scripts/` | Migration, seed, and API acceptance scripts. |
-| `docs/` | Requirements, design decisions, API contract, implementation progress, and test evidence. |
+| `docs/CHANGELOG.md` | Tracked record of implementation changes, checks, and open gaps. |
 
-Start with [requirements](docs/REQUIREMENTS.md), [architecture](docs/ARCHITECTURE.md), [API contract](docs/API_CONTRACT.md), and the [implementation plan](docs/IMPLEMENTATION_PLAN.md). The [changelog](docs/CHANGELOG.md) records verified changes. The [development blueprint](docs/DEVELOPMENT_BLUEPRINT.md) is an earlier reference, not a statement of completed behavior.
+## Documentation in Git
+
+Git tracks this README and [docs/CHANGELOG.md](docs/CHANGELOG.md). All other Markdown files under `docs/` are ignored and remain in local working copies only. They are absent from a fresh clone and the current GitHub file tree, though earlier commits still contain them. This README contains the setup and current feature status needed to use the repository without those local files.

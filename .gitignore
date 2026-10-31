@@ -122,12 +122,12 @@ Desktop.ini
 *.local
 
 # ============================================================
-# Track the project documentation pack alongside the root README.
-# Other Markdown files, such as generated dependency READMEs, stay ignored.
+# Track the root README and docs/CHANGELOG.md only.
+# Other Markdown files, including the rest of docs/, stay local.
 # ============================================================
 
 *.md
 !/README.md
-!/docs/*.md
+!/docs/CHANGELOG.md
 
 

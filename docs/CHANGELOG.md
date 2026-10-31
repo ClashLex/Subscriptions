@@ -6,6 +6,11 @@ All notable project, documentation, and implementation changes should be recorde
 
 ## [Unreleased]
 
+### Documentation — 2026-10-31 (Git tracking convention)
+
+- Git now tracks only the root README and `docs/CHANGELOG.md` among Markdown files. Other `docs/*.md` files remain on disk locally but are removed from Git's index and ignored for future commits.
+- Updated the README to explain which documentation is available in a fresh clone and removed links to local-only files.
+
 ### Documentation — 2026-10-31 (README rewrite)
 
 - Replaced the root README with a verified project overview, feature-status table, local setup commands, roles, checks, repository map, and links into the tracked documentation pack.
