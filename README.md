@@ -76,6 +76,8 @@ Invoice balance and finance dashboard update
 
 This documentation package is an initial planning baseline. It does **not** mean that the application features have already been implemented. Keep the checklists in the implementation plan and the test plan accurate as development progresses.
 
+Implementation progress so far: the local infrastructure (Node LTS, MySQL 8.4 via Docker Compose, Express + TypeScript skeleton, migration runner, health endpoint) is running and verified; application features begin with the next phase.
+
 ## Repository documentation convention
 
 The README at the repository root is the only documentation file tracked in Git. All other documentation lives in a root `docs/` directory and is intentionally excluded from version control; the `.gitignore` ignores every Markdown file except this README. Keep the README a standalone overview that does not duplicate pack contents, so copies cannot drift apart.
