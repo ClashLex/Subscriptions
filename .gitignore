@@ -1,0 +1,124 @@
+# ============================================================
+# Subscriptions — project-wide .gitignore
+# React + Vite + TypeScript frontend
+# Node.js + Express + TypeScript backend
+# MySQL, Docker, and common development tools
+# ============================================================
+
+# Dependencies
+node_modules/
+**/node_modules/
+.pnp/
+.pnp.*
+.yarn/*
+!.yarn/patches/
+!.yarn/plugins/
+!.yarn/releases/
+!.yarn/versions/
+
+# Build output
+dist/
+build/
+out/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+*.map
+
+# Vite / framework caches
+.vite/
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.svelte-kit/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+**/secrets/
+
+# Logs and runtime files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.pid
+*.pid.lock
+pids/
+*.seed
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Test artifacts
+playwright-report/
+test-results/
+.nock/
+
+# Local databases, dumps, and database runtime files
+*.sqlite
+*.sqlite3
+*.db
+*.sql.gz
+*.dump
+mysql-data/
+mysql/
+data/mysql/
+# Keep SQL migrations and intentional seed scripts tracked.
+!**/migrations/
+!**/migrations/**
+!**/seeds/
+!**/seeds/**
+
+# Docker local overrides and generated volumes
+docker-compose.override.yml
+docker-compose.override.yaml
+compose.override.yaml
+**/.docker-data/
+.docker/
+
+# IDE and editor settings
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+*.sublime-workspace
+*.code-workspace
+
+# Operating system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Package-manager / tool caches
+.npm/
+.pnpm-store/
+.yarn-cache/
+.eslintcache
+.stylelintcache
+.turbo/
+*.local
+
+
