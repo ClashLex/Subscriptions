@@ -28,6 +28,8 @@ Recommended line calculation sequence:
 
 Do not use cost price as the customer-facing sales price. Cost price is for internal reporting only and should be hidden from staff/customers unless their role requires it.
 
+Current implementation: `plans.price` is stored and displayed when selecting a plan, but invoice totals are calculated from the subscription's snapshotted product lines. It is not added as a plan fee. This pricing rule should be made explicit in the UI before treating plan price as the amount due.
+
 ## 4. Tax rules
 
 Admin manages tax rules with name, rate, mode, and active state. The recommended default is tax-exclusive. If a tax rule is changed later, existing invoice lines retain the name/rate/mode snapshot used when the invoice was created.

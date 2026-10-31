@@ -1,83 +1,143 @@
-# Subscriptions — Project Documentation
+# Subscriptions
 
-> **Documentation update rule:** After every completed implementation step, update the project documentation under `docs/` before beginning the next step. Change only information verified against the current code, database, tests, or running UI. Record the date, step completed, resulting behaviour, any deviation or unresolved issue, and update the changelog. Never mark an unimplemented or untested item as complete.
+**Subscription and recurring revenue management for the fictional Brightloop Software.**
 
-## Project summary
+Subscriptions is an independent Make-A-Ton 9.0 project. It brings product and plan setup, customer contracts, recurring billing, discounts, taxes, invoices, and payment recording into one application. It is not an official Odoo product.
 
-**Subscriptions** is a subscription and recurring-revenue management application being built for the Make-A-Ton 9.0 problem statement for the fictional company Brightloop Software. It is intended to bring product and plan configuration, customer subscriptions, recurring invoices, discounts, taxes, payments, and finance reporting into one system.
+## Current status
 
-**Product subtitle:** Subscription & Recurring Revenue Management  
-**Tagline:** Every subscription. Every cycle. Under control.
+The application is under active development. The table separates features available in the browser from features available through the API.
 
-This is an independent hackathon implementation. It is not an official Odoo product or an Odoo-branded application.
+| Area | Available now |
+|---|---|
+| Browser | Sign in, customer registration and password reset; Admin and Staff catalogue, tax, plan, quotation template, and subscription screens; customer subscription list. |
+| API | Authentication and roles; customer directory; catalogue and plans; quotation and subscription lifecycle; discount rules; recurring invoice generation; invoice reads and confirmation/cancellation; payment recording and reads. |
+| Billing trigger | Admin-only `POST /api/v1/billing/run`, or an optional in-process scheduler. The scheduler is disabled by default. |
+| Still to build | Invoice and payment screens, an Admin billing control, invoice email/PDF, finance dashboard, and fuller customer billing views. |
 
-## Start here
+The main workflow is: configure a product and plan, create a customer subscription, submit and confirm its quotation, activate it, generate an invoice when due, confirm the invoice, and record payments. Billing and payment actions currently require an API client; the browser does not yet expose those controls.
 
-The documentation pack in `docs/` should be read in this order when you are new to the project:
+**Pricing rule today:** invoice amounts come from the subscription's snapshotted product lines. The plan's `price` is displayed in the UI but does not determine the invoice total. See [billing decisions](docs/BILLING_AND_FINANCE.md) before changing this behavior.
 
-1. Requirements and acceptance criteria — what the challenge explicitly asks for.
-2. Business workflows — how a customer, subscription, invoice, and payment move through the system.
-3. Architecture — how the browser, API, backend services, and database connect.
-4. Data model — the entities and relationships that store the business data.
-5. Billing and finance — recurring billing, invoices, taxes, discounts, payments, and reporting rules.
-6. Security and access — authentication, roles, and customer data boundaries.
-7. API contract and UI/UX specification — how the frontend and backend communicate and what each user sees.
-8. Implementation plan — the recommended build order and completion criteria.
-9. Test plan — how to verify the implementation.
-10. Development guide and deployment/demo guide — how to run, configure, and demonstrate it.
-11. The detailed development blueprint — setup commands, code patterns, and extended guidance.
+## Technology
 
-## Source of truth and decision hierarchy
+- **Client:** React 19, TypeScript, Vite 8, Tailwind CSS 4.
+- **Server:** Node.js, Express 5, TypeScript, Zod, MySQL2.
+- **Database:** MySQL 8.4 with ordered SQL migrations.
+- **Authentication:** MySQL-backed server sessions, HTTP-only cookies, and Argon2id password hashes.
+- **Money:** decimal strings at API boundaries and integer minor units for calculations.
 
-Use this order when documents or code disagree:
+This is one modular application: the browser calls the versioned Express API, and the API reads and writes MySQL. During local development, Vite proxies `/api` requests to the server.
 
-1. The supplied `Subscription_Management_System.pdf` is the source for the challenge's functional requirements. It is not bundled here because this ZIP contains Markdown documentation.
-2. A later, explicit decision recorded in this documentation and the changelog controls implementation choices that the challenge does not specify.
-3. The code, migrations, and tests describe what is currently implemented. Documentation must be brought into line with verified code after each implementation step.
-4. The detailed development blueprint is the earlier reference. Its suggestions are not automatically organizer requirements.
+## Run locally
 
-Keep requirements separate from recommended design decisions. Where the challenge leaves behaviour unspecified, document the choice as a project decision rather than presenting it as a mandatory challenge rule.
+### Prerequisites
 
-## Recommended technology baseline
+- Node.js **26** (see [.nvmrc](.nvmrc)) and npm.
+- Docker with Compose for the supplied MySQL setup, or a compatible local MySQL 8.4 instance.
+- Git.
 
-- Frontend: React, TypeScript, Vite, Tailwind CSS.
-- Backend: Node.js, Express, TypeScript.
-- Database: MySQL 8.4 with InnoDB.
-- Data access: `mysql2/promise`, parameterized SQL, and a shared connection pool.
-- Validation: Zod at API boundaries, with database constraints for critical invariants.
-- Authentication: server-side sessions with secure HTTP-only cookies; Argon2id password hashes.
-- Architecture: one modular monolith, not microservices.
+The commands below use Windows PowerShell. On macOS/Linux, use `cp` instead of `Copy-Item` and `npm` instead of `npm.cmd`.
 
-Use the exact installed runtime and package versions in the repository's lockfiles. Check current official documentation if setup commands or major versions have changed.
+### 1. Configure the environment and database
 
-## Core end-to-end outcome
+From the repository root:
 
-The main demonstrable flow should work without manually editing database rows:
-
-```text
-Admin creates product and plan
-          ↓
-Customer account is registered / created
-          ↓
-Subscription is drafted and confirmed
-          ↓
-Subscription becomes active and reaches a billing date
-          ↓
-Billing service creates one invoice for that period
-          ↓
-Tax and eligible discount are calculated
-          ↓
-Staff records payment against the invoice
-          ↓
-Invoice balance and finance dashboard update
+```powershell
+Copy-Item .env.example .env
 ```
 
-## Project status
+Edit `.env` before starting anything. Set `DB_PASSWORD`, `MYSQL_ROOT_PASSWORD`, and a random `SESSION_SECRET` of at least 32 characters. Set `SEED_ADMIN_EMAIL` and a strong `SEED_ADMIN_PASSWORD` for the demo Admin account. The example values are placeholders; `.env` is ignored by Git. The same file is read by Docker Compose and the API.
 
-The documentation pack contains both the original plan and dated implementation notes. Check the current code and test results before treating a planned feature as complete.
+```powershell
+docker compose up -d mysql
+```
 
-Implementation progress so far: local infrastructure, authentication and roles, catalogue and plans, quotation/subscription backend and staff screens, and the customer subscription portal are implemented. The Phase 5 billing API includes an Admin-only run trigger, discount rules, recurring invoice generation with transactional snapshots, invoice confirmation/cancellation, customer-scoped invoice reads, and atomic payment recording with partial/full balance handling. An optional automatic billing runner (`BILLING_RUN_INTERVAL_MINUTES`, off unless set) reuses the same billing service as the Admin trigger. The client now includes password-reset pages and a verified paginated-list response helper. The billing/invoice UI, invoice email/print, and finance dashboard remain to be implemented. API acceptance suites were previously recorded as passing; they require a running MySQL and API service to re-run.
+If using an existing MySQL server, create the database and application user named in `.env` and skip the Compose command.
 
-## Repository documentation convention
+### 2. Install dependencies, migrate, and seed
 
-The root README and the `docs/` documentation pack are tracked in Git. Update the relevant document and `docs/CHANGELOG.md` when behavior changes. Keep the README a short overview and use the pack for detailed requirements, decisions, and test evidence.
+```powershell
+Set-Location server
+npm.cmd ci
+npm.cmd run migrate
+npm.cmd run seed
+```
+
+`migrate` applies pending files in `server/migrations/` and records them in `schema_migrations`. `seed` creates or updates the Admin account from `.env`; it does not create a full demo dataset.
+
+### 3. Start the API and browser
+
+In the server terminal:
+
+```powershell
+npm.cmd run dev
+```
+
+In a second terminal, from the repository root:
+
+```powershell
+Set-Location client
+npm.cmd ci
+npm.cmd run dev
+```
+
+Open **http://localhost:5173**. The API listens on **http://localhost:4000**. A ready database should make **http://localhost:4000/api/v1/health** return `data.status: "ready"`; it returns HTTP 503 when the database is unavailable.
+
+For a compiled API run, execute `npm.cmd run build` and then `npm.cmd run start` from `server/`. The client production bundle is created with `npm.cmd run build` from `client/`. A public deployment still needs HTTPS, a reverse proxy for `/api`, persistent MySQL, and environment-specific configuration.
+
+## Roles and workflow
+
+| Role | Main access |
+|---|---|
+| Admin | Configure products, variants, taxes, and plans; manage users; run billing; manage subscriptions and finance records. |
+| Staff | Read catalogue configuration; create and edit quotation templates and subscriptions; confirm invoices and record payments through the API. |
+| Customer | Register and sign in; see their own subscriptions in the portal and their own invoices/payments through the API. |
+
+Subscriptions follow **Draft → Quotation → Confirmed → Active**. Active subscriptions may be paused, resumed, closed, or renewed according to plan policy. Invoice generation snapshots line prices, tax, and any eligible discount. A unique database key prevents duplicate invoices for the same subscription period. Payments can cover part or all of a confirmed invoice; overpayments are rejected.
+
+The optional scheduler uses `BILLING_RUN_INTERVAL_MINUTES` in `.env`. A positive value starts periodic runs after the configured interval. Leave it blank or set it to `0` to use only the Admin API trigger. The scheduler has not yet been verified in a live deployment.
+
+Password reset uses SMTP when configured. In local development without SMTP, the reset link is logged by the server and returned to the browser as a development link.
+
+## Checks
+
+With the server and database running, run the API acceptance scripts from `server/`:
+
+```powershell
+npm.cmd run test:auth
+npm.cmd run test:catalogue
+npm.cmd run test:subscriptions
+npm.cmd run test:billing
+```
+
+These scripts create test records in the configured database, so use a local test or demo database. The billing suite covers its daily invoice path; weekly, monthly, yearly, concurrent-run, and large-dataset cases still need broader verification.
+
+The checks below do not require the running API:
+
+```powershell
+# From server/
+npm.cmd run typecheck
+npm.cmd run build
+
+# From client/
+npm.cmd run test:api
+npm.cmd run lint
+npm.cmd run build
+```
+
+The latest local pre-push review passed these static checks. The live API suites were not rerun in that environment because MySQL and the API were unavailable. See the [test plan](docs/TEST_PLAN.md) for recorded evidence and open cases.
+
+## Repository map
+
+| Path | Contents |
+|---|---|
+| `client/src/pages/` | Role-specific React pages. |
+| `client/src/lib/api.ts` | Shared browser API client and response handling. |
+| `server/src/modules/` | API routes, schemas, and business services. |
+| `server/src/jobs/` | Optional billing scheduler. |
+| `server/migrations/` | Ordered MySQL schema changes. |
+| `server/scripts/` | Migration, seed, and API acceptance scripts. |
+| `docs/` | Requirements, design decisions, API contract, implementation progress, and test evidence. |
+
+Start with [requirements](docs/REQUIREMENTS.md), [architecture](docs/ARCHITECTURE.md), [API contract](docs/API_CONTRACT.md), and the [implementation plan](docs/IMPLEMENTATION_PLAN.md). The [changelog](docs/CHANGELOG.md) records verified changes. The [development blueprint](docs/DEVELOPMENT_BLUEPRINT.md) is an earlier reference, not a statement of completed behavior.

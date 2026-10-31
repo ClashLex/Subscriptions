@@ -6,6 +6,13 @@ All notable project, documentation, and implementation changes should be recorde
 
 ## [Unreleased]
 
+### Documentation — 2026-10-31 (README rewrite)
+
+- Replaced the root README with a verified project overview, feature-status table, local setup commands, roles, checks, repository map, and links into the tracked documentation pack.
+- Clarified in the billing guide that the current invoice calculation uses subscription line prices rather than `plans.price`.
+- Corrected the server `start` script and development guide to use the actual TypeScript build output at `dist/src/server.js`.
+- No live database or browser acceptance run was performed for this documentation update.
+
 ### Fixed — 2026-10-31 (pre-push review)
 
 - The client list helper now preserves API pagination metadata and array data; a focused mocked-fetch test covers paginated lists, the unpaginated customer directory, a detail response, and API errors.
