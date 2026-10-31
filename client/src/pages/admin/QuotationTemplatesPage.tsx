@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { asApiError, list, request, type ApiError } from "../../lib/api.js";
 import type { Plan, QuotationTemplate, TaxRule } from "../../lib/types.js";
-import { useSession } from "../../state/session.js";
 import { Button, ErrorBanner, Field, Modal, PageHeading, Select, TableShell, TextInput } from "../../ui/components.js";
 import { ItemsEditor, type ItemRow } from "../../ui/ItemsEditor.js";
 
@@ -14,8 +13,6 @@ interface TemplateDraft {
 const EMPTY_DRAFT: TemplateDraft = { name: "", validityDays: "15", defaultPlanId: null };
 
 export function TemplatesPage() {
-  const session = useSession();
-  const isAdmin = session.isAdmin;
   const [rows, setRows] = useState<QuotationTemplate[] | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [taxes, setTaxes] = useState<Array<{ id: number; name: string; taxMode: string }>>([]);
@@ -115,7 +112,7 @@ export function TemplatesPage() {
       />
       <div className="mb-4 flex items-center justify-between">
         <span className="text-sm text-slate-500">{rows === null ? "Loading…" : `${rows.length} template(s)`}</span>
-        {isAdmin ? <Button onClick={openCreate}>New template</Button> : null}
+        <Button onClick={openCreate}>New template</Button>
       </div>
       <ErrorBanner error={error} />
       <TableShell
@@ -147,13 +144,9 @@ export function TemplatesPage() {
                 {template.items.map((item) => `${item.quantity}× ${item.productName}${item.variantName ? ` (${item.variantName})` : ""}`).join(", ")}
               </td>
               <td className="px-3 py-2 text-right">
-                {isAdmin ? (
-                  <Button variant="secondary" onClick={() => openEdit(template)}>
-                    Edit
-                  </Button>
-                ) : (
-                  <span className="text-xs text-slate-400">Read-only</span>
-                )}
+                <Button variant="secondary" onClick={() => openEdit(template)}>
+                  Edit
+                </Button>
               </td>
             </tr>
           ))

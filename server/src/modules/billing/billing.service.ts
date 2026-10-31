@@ -80,6 +80,7 @@ export interface BillingRunResult {
   invoices: InvoiceResult[];
   skipped: SkippedResult[];
   autoClosed: Array<{ subscriptionId: number; subscriptionNumber: string }>;
+  failed: Array<{ subscriptionId: number; subscriptionNumber: string; operation: "BILL" | "AUTO_CLOSE" }>;
 }
 
 /** One cent-level percentage with half-up rounding (mirror of money.ts). */
@@ -527,14 +528,25 @@ async function autoCloseOne(
 ): Promise<{ subscriptionId: number; subscriptionNumber: string; closed: boolean }> {
   await withTransaction(async (connection) => {
     const [lockedRows] = await connection.execute(
-      "SELECT id, subscription_number, status, expiry_date FROM subscriptions WHERE id = ? LIMIT 1 FOR UPDATE",
+      "SELECT id, subscription_number, status, expiry_date, next_billing_at FROM subscriptions WHERE id = ? LIMIT 1 FOR UPDATE",
       [subscriptionId],
     );
-    const subscription = (lockedRows as Array<RowDataPacket & { id: number; subscription_number: string; status: string; expiry_date: string | null }>)[0];
+    const subscription = (lockedRows as Array<RowDataPacket & {
+      id: number;
+      subscription_number: string;
+      status: string;
+      expiry_date: string | null;
+      next_billing_at: string | null;
+    }>)[0];
     if (!subscription || subscription.status !== "ACTIVE") {
       return;
     }
     if (subscription.expiry_date === null || subscription.expiry_date > todayIso()) {
+      return;
+    }
+    // Keep the contract active for a retry when its final billable period has
+    // not produced an invoice yet.
+    if (subscription.next_billing_at !== null && subscription.next_billing_at.slice(0, 10) < subscription.expiry_date) {
       return;
     }
     const closedAt = new Date();
@@ -573,40 +585,67 @@ async function autoCloseOne(
  */
 export async function runBilling(actorId: number | null): Promise<BillingRunResult> {
   const nowStamp = mysqlUtc(new Date());
-  const candidates = await query<DueCandidateRow[]>(
-    `SELECT s.id, s.subscription_number, s.next_billing_at, s.expiry_date,
+  const result: BillingRunResult = { scanned: 0, invoices: [], skipped: [], autoClosed: [], failed: [] };
+  let afterId = 0;
+
+  // Keyset pagination reaches later subscriptions even when an earlier one is
+  // skipped or fails and remains due for the next run.
+  for (;;) {
+    const candidates = await query<DueCandidateRow[]>(
+      `SELECT s.id, s.subscription_number, s.next_billing_at, s.expiry_date,
             p.billing_interval_unit, p.billing_interval_count
      FROM subscriptions s JOIN plans p ON p.id = s.plan_id
      WHERE s.status = 'ACTIVE' AND s.next_billing_at IS NOT NULL AND s.next_billing_at <= ?
+       AND s.id > ?
      ORDER BY s.id
      LIMIT 500`,
-    [nowStamp],
-  );
-
-  const result: BillingRunResult = { scanned: candidates.length, invoices: [], skipped: [], autoClosed: [] };
-
-  for (const candidate of candidates) {
-    const outcome = await billOne(candidate.id, actorId, nowStamp);
-    if ("reason" in outcome) {
-      result.skipped.push(outcome);
-    } else {
-      result.invoices.push(outcome);
+      [nowStamp, afterId],
+    );
+    if (candidates.length === 0) break;
+    for (const candidate of candidates) {
+      afterId = candidate.id;
+      result.scanned += 1;
+      try {
+        const outcome = await billOne(candidate.id, actorId, nowStamp);
+        if ("reason" in outcome) {
+          result.skipped.push(outcome);
+        } else {
+          result.invoices.push(outcome);
+        }
+      } catch (error) {
+        console.error(`[billing] subscription ${candidate.id} failed:`, error);
+        result.failed.push({
+          subscriptionId: candidate.id,
+          subscriptionNumber: candidate.subscription_number,
+          operation: "BILL",
+        });
+      }
     }
   }
 
-  const closeable = await query<Array<RowDataPacket & { id: number; subscription_number: string }>>(
-    `SELECT s.id, s.subscription_number
+  let afterCloseId = 0;
+  for (;;) {
+    const closeable = await query<Array<RowDataPacket & { id: number; subscription_number: string }>>(
+      `SELECT s.id, s.subscription_number
      FROM subscriptions s JOIN plans p ON p.id = s.plan_id
      WHERE p.auto_close = 1 AND s.status = 'ACTIVE'
-       AND s.expiry_date IS NOT NULL AND s.expiry_date <= ?
+       AND s.expiry_date IS NOT NULL AND s.expiry_date <= ? AND s.id > ?
      ORDER BY s.id
      LIMIT 500`,
-    [todayIso()],
-  );
-  for (const row of closeable) {
-    const closed = await autoCloseOne(row.id, actorId);
-    if (closed.closed) {
-      result.autoClosed.push({ subscriptionId: row.id, subscriptionNumber: closed.subscriptionNumber });
+      [todayIso(), afterCloseId],
+    );
+    if (closeable.length === 0) break;
+    for (const row of closeable) {
+      afterCloseId = row.id;
+      try {
+        const closed = await autoCloseOne(row.id, actorId);
+        if (closed.closed) {
+          result.autoClosed.push({ subscriptionId: row.id, subscriptionNumber: closed.subscriptionNumber });
+        }
+      } catch (error) {
+        console.error(`[billing] auto-close ${row.id} failed:`, error);
+        result.failed.push({ subscriptionId: row.id, subscriptionNumber: row.subscription_number, operation: "AUTO_CLOSE" });
+      }
     }
   }
 

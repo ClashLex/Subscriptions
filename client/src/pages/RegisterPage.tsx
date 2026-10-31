@@ -67,7 +67,7 @@ export function RegisterPage() {
             />
           </Field>
           <p className="text-xs text-slate-500">
-            At least 8 characters with an uppercase letter, a lowercase letter, and a special character.
+            More than 8 characters with an uppercase letter, a lowercase letter, and a special character.
           </p>
           <Button type="submit" disabled={busy} className="w-full">
             {busy ? "Creating\u2026" : "Create account"}

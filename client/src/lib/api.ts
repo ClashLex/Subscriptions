@@ -41,10 +41,10 @@ interface Envelope {
   error?: { code: string; message: string; details?: ApiErrorDetails };
 }
 
-export async function request<T>(
+async function requestEnvelope<T>(
   path: string,
   init?: { method?: string; body?: unknown },
-): Promise<T> {
+): Promise<Envelope & { data?: T }> {
   const hasBody = init?.body !== undefined;
   const response = await fetch(`/api/v1${path}`, {
     method: init?.method ?? "GET",
@@ -72,7 +72,15 @@ export async function request<T>(
     );
   }
 
-  return (payload?.data ?? null) as T;
+  return (payload ?? {}) as Envelope & { data?: T };
+}
+
+export async function request<T>(
+  path: string,
+  init?: { method?: string; body?: unknown },
+): Promise<T> {
+  const payload = await requestEnvelope<T>(path, init);
+  return (payload.data ?? null) as T;
 }
 
 /** For pages: { data } alongside the pagination { meta }. */
@@ -80,8 +88,11 @@ export async function list<T>(
   path: string,
   init?: { method?: string; body?: unknown },
 ): Promise<{ data: T[]; meta: PageMeta }> {
-  const payload = await request<{ data: T[]; meta?: PageMeta }>(path, init);
-  return { data: payload.data ?? [], meta: payload.meta ?? { ...EMPTY_PAGE } };
+  const payload = await requestEnvelope<T[]>(path, init);
+  if (!Array.isArray(payload.data)) {
+    throw new ApiError(0, "INVALID_RESPONSE", "The server returned an invalid list response.");
+  }
+  return { data: payload.data, meta: payload.meta ?? { ...EMPTY_PAGE } };
 }
 
 export function asApiError(error: unknown): ApiError {

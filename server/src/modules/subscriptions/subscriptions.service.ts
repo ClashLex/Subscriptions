@@ -184,6 +184,9 @@ async function resolveCatalogueLines(
       if (!variant) {
         throw new AppError(404, "VARIANT_NOT_FOUND", `Variant ${input.variantId} does not belong to product ${input.productId}.`);
       }
+      if (variant.is_active === 0 && input.unitPrice === undefined) {
+        throw new AppError(400, "VARIANT_NOT_ACTIVE", `Variant ${variant.name} is not active.`);
+      }
       variantId = variant.id;
       description = `${product.name} — ${variant.name}`;
       unitPrice = input.unitPrice ?? addMoney(product.salesPrice, variant.price_adjustment);
@@ -720,11 +723,12 @@ export async function updateSubscription(
     if (dto.planId !== undefined || dto.startDate !== undefined) {
       validatePlanAvailability(plan, nextStart);
     }
-    if (dto.expiryDate !== undefined && dto.expiryDate !== null && dto.expiryDate <= nextStart) {
+    const nextExpiry = dto.expiryDate === undefined ? subscription.expiry_date : dto.expiryDate;
+    if (nextExpiry !== null && nextExpiry <= nextStart) {
       throw new AppError(
         400,
         "INVALID_CONTRACT_END",
-        `The contract end (${dto.expiryDate}) must be after the start date (${nextStart}).`,
+        `The contract end (${nextExpiry}) must be after the start date (${nextStart}).`,
       );
     }
 

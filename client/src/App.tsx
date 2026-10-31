@@ -4,6 +4,8 @@ import { PageLoader } from "./ui/components.js";
 import { AdminLayout } from "./pages/AdminLayout.js";
 import { LoginPage, homeFor } from "./pages/LoginPage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage.js";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage.js";
 import { OverviewPage } from "./pages/OverviewPage.js";
 import { PortalPage } from "./pages/PortalPage.js";
 import { ProductsPage } from "./pages/admin/ProductsPage.js";
@@ -91,6 +93,8 @@ export default function App() {
               </PublicOnly>
             }
           />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           {/* "/" resolves by role once the session is known. */}
           <Route path="/" element={<HomeRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />

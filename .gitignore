@@ -122,12 +122,12 @@ Desktop.ini
 *.local
 
 # ============================================================
-# Documentation: only the root README is tracked in Git.
-# Every other Markdown file (including the docs/ pack) is
-# intentionally untracked and maintained outside the repository.
+# Track the project documentation pack alongside the root README.
+# Other Markdown files, such as generated dependency READMEs, stay ignored.
 # ============================================================
 
 *.md
 !/README.md
+!/docs/*.md
 
 

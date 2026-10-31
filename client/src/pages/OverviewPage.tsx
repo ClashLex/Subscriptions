@@ -44,7 +44,7 @@ export function OverviewPage() {
     <div>
       <PageHeading
         title="Overview"
-        subtitle="Catalogue setup is Phase 3; quotations, subscriptions, invoices, and payments land in later phases."
+        subtitle="Manage the catalogue, plans, quotations, and subscriptions. Billing and finance screens are in progress."
       />
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

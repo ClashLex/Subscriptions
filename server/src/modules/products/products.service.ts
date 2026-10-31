@@ -134,12 +134,16 @@ export async function updateProduct(id: number, dto: ProductUpdateDto): Promise<
   if (!existing) {
     throw new AppError(404, "NOT_FOUND", "Product not found.");
   }
+  const nextSalesPrice = dto.salesPrice ?? existing.sales_price;
+  for (const variant of await listVariantsForProduct(id)) {
+    assertEffectivePriceNotNegative(nextSalesPrice, variant.price_adjustment);
+  }
   await execute(
     `UPDATE products SET name = ?, type = ?, sales_price = ?, cost_price = ?, notes = ?, is_active = ? WHERE id = ?`,
     [
       dto.name ?? existing.name,
       dto.type ?? existing.type,
-      dto.salesPrice ?? existing.sales_price,
+      nextSalesPrice,
       dto.costPrice ?? existing.cost_price,
       dto.notes === undefined ? existing.notes : dto.notes,
       (dto.isActive === undefined ? existing.is_active === 1 : dto.isActive) ? 1 : 0,

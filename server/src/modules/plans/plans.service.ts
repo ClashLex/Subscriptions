@@ -150,7 +150,11 @@ export async function updatePlan(id: number, dto: PlanUpdateDto): Promise<PlanRo
   if (!existing) {
     throw new AppError(404, "NOT_FOUND", "Plan not found.");
   }
-  validateAvailabilityWindow(dto);
+  validateAvailabilityWindow({
+    ...dto,
+    availableFrom: dto.availableFrom === undefined ? existing.available_from : dto.availableFrom,
+    availableUntil: dto.availableUntil === undefined ? existing.available_until : dto.availableUntil,
+  });
   await execute(
     `UPDATE plans SET name = ?, description = ?, price = ?, billing_interval_unit = ?,
      billing_interval_count = ?, minimum_quantity = ?, available_from = ?, available_until = ?,

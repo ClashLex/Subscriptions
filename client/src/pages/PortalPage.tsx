@@ -14,7 +14,7 @@ function statusTone(status: SubscriptionListItem["status"]): "green" | "amber" |
 
 /**
  * Customer portal (Phase 4 scope): the customer's own subscriptions, scoped
- * server-side. Invoices and payments arrive with Phases 5–6.
+ * server-side. Invoice and payment views are still being added to the portal.
  */
 export function PortalPage() {
   const session = useSession();
@@ -111,7 +111,7 @@ export function PortalPage() {
         )}
 
         <p className="mt-6 text-xs text-slate-400">
-          Invoices, payment history, and billing-split flows arrive in Phases 5–6.
+          Invoice and payment history views are being added to this portal.
         </p>
       </main>
     </div>

@@ -28,11 +28,12 @@ export function startBillingScheduler(): () => void {
     running = true;
     void runBilling(null)
       .then((result) => {
-        if (result.invoices.length > 0 || result.autoClosed.length > 0) {
+        if (result.invoices.length > 0 || result.autoClosed.length > 0 || result.failed.length > 0) {
           // eslint-disable-next-line no-console
           console.log(
             `[billing] automatic run: ${result.invoices.length} invoice(s), `
-              + `${result.autoClosed.length} auto-closed, ${result.skipped.length} skipped`,
+              + `${result.autoClosed.length} auto-closed, ${result.skipped.length} skipped, `
+              + `${result.failed.length} failed`,
           );
         }
       })

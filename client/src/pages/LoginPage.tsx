@@ -71,6 +71,9 @@ export function LoginPage() {
             {busy ? "Signing in\u2026" : "Sign in"}
           </Button>
         </form>
+        <p className="text-center text-sm">
+          <Link className="font-medium text-indigo-600 hover:underline" to="/forgot-password">Forgot password?</Link>
+        </p>
         <p className="text-center text-sm text-slate-500">
           New customer?{" "}
           <Link className="font-medium text-indigo-600 hover:underline" to="/register">
