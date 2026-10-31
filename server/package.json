@@ -3,14 +3,6 @@
   "version": "0.0.1",
   "description": "",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js",
-    "migrate": "tsx scripts/migrate.ts",
-    "typecheck": "tsc --noEmit"
-  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -42,5 +34,14 @@
   "allowScripts": {
     "argon2@0.45.1": true,
     "esbuild@0.28.2": true
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "migrate": "tsx scripts/migrate.ts",
+    "seed": "tsx scripts/seed.ts",
+    "typecheck": "tsc --noEmit",
+    "test:auth": "node --env-file=../.env scripts/test-auth.mjs"
   }
 }

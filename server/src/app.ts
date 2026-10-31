@@ -6,6 +6,8 @@ import session from "express-session";
 import MySQLStoreFactory from "express-mysql-session";
 import { env } from "./config/env.js";
 import { healthRouter } from "./routes/health.js";
+import { authRouter } from "./modules/auth/auth.routes.js";
+import { usersRouter } from "./modules/users/users.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/errors.js";
 
 const MySQLStore = MySQLStoreFactory(session);
@@ -58,6 +60,8 @@ export function createApp(): Express {
   );
 
   app.use("/api/v1", healthRouter);
+  app.use("/api/v1/auth", authRouter);
+  app.use("/api/v1/users", usersRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

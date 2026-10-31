@@ -25,6 +25,15 @@ export function notFoundHandler(req: Request, res: Response): void {
   });
 }
 
+/** Wraps async route handlers so rejections reach the error middleware. */
+export function asyncHandler(
+  handler: (req: Request, res: Response, next: NextFunction) => Promise<unknown>,
+): (req: Request, res: Response, next: NextFunction) => void {
+  return (req, res, next) => {
+    Promise.resolve(handler(req, res, next)).catch(next);
+  };
+}
+
 /** Central error middleware — never leaks stack traces or SQL (API_CONTRACT.md §1). */
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof ZodError) {

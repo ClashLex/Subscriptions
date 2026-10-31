@@ -38,6 +38,10 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   MAIL_FROM: z.string().optional(),
+
+  // Demo seed only (scripts/seed.ts); optional.
+  SEED_ADMIN_EMAIL: z.string().trim().toLowerCase().email().optional(),
+  SEED_ADMIN_PASSWORD: z.string().optional(),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV === "production") {
     if (value.DB_PASSWORD === "replace_me") {
