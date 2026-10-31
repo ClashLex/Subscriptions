@@ -42,6 +42,7 @@
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
     "typecheck": "tsc --noEmit",
-    "test:auth": "node --env-file=../.env scripts/test-auth.mjs"
+    "test:auth": "node --env-file=../.env scripts/test-auth.mjs",
+    "test:catalogue": "node --env-file=../.env scripts/test-catalogue.mjs"
   }
 }

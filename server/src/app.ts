@@ -8,6 +8,9 @@ import { env } from "./config/env.js";
 import { healthRouter } from "./routes/health.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { usersRouter } from "./modules/users/users.routes.js";
+import { productsRouter } from "./modules/products/products.routes.js";
+import { taxesRouter } from "./modules/taxes/taxes.routes.js";
+import { plansRouter } from "./modules/plans/plans.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/errors.js";
 
 const MySQLStore = MySQLStoreFactory(session);
@@ -62,6 +65,9 @@ export function createApp(): Express {
   app.use("/api/v1", healthRouter);
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/users", usersRouter);
+  app.use("/api/v1/products", productsRouter);
+  app.use("/api/v1/taxes", taxesRouter);
+  app.use("/api/v1/plans", plansRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

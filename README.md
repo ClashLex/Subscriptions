@@ -76,7 +76,7 @@ Invoice balance and finance dashboard update
 
 This documentation package is an initial planning baseline. It does **not** mean that the application features have already been implemented. Keep the checklists in the implementation plan and the test plan accurate as development progresses.
 
-Implementation progress so far: the local infrastructure (Node LTS, MySQL 8.4 via Docker Compose, Express + TypeScript skeleton, migration runner, health endpoint) is running and verified, and authentication with three roles (register/login/logout, admin-managed staff, password reset) passes its full acceptance suite. Feature phases beyond authentication are next.
+Implementation progress so far: the local infrastructure (Node LTS, MySQL 8.4 via Docker Compose, Express + TypeScript skeleton, migration runner, health endpoint), authentication with three roles (register/login/logout, admin-managed staff, password reset), and the catalogue backend (products with price-adjusted variants and computed effective prices, tax rules, subscription plans with availability windows, pause/close/renewal policy flags) are implemented and verified by automated acceptance suites. The catalogue admin screens and the subscription lifecycle (quotation templates, quotations, pause/resume/close/renew) are next.
 
 ## Repository documentation convention
 
