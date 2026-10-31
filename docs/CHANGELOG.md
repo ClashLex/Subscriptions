@@ -6,6 +6,12 @@ All notable project, documentation, and implementation changes should be recorde
 
 ## [Unreleased]
 
+### Fixed Dither background visibility — 2026-10-31
+
+- Increased the workspace Dither palette contrast and wave speed. Added moving pixel texture and color gradients behind workspace and sign-in content, so the background remains visible when WebGL2 cannot render.
+- Added a WebGL2 health check around the upstream Dither component. The failed canvas is omitted in unsupported browsers, leaving the animated CSS fallback unobscured. Reduced-motion preferences keep the background still.
+- Verified the client build and lint, Admin/Customer billing browser flow, rendered desktop and 390 px mobile layouts, active CSS background movement, and no mobile horizontal overflow. The headless Edge test browser had no usable WebGL2 context, so its screenshots exercised the fallback.
+
 ### Dither workspace background — 2026-10-31
 
 - Extended the supplied React Bits Dither component from the sign-in visual to a soft, fixed background behind Admin, Staff, and Customer pages. The canvas ignores pointer input and uses a low-resolution palette so forms, tables, and cards remain readable. A CSS gradient is visible when WebGL2 is unavailable.

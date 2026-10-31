@@ -1,17 +1,17 @@
-import Dither from "../reactbits/Dither.js";
+import { WebGLDither } from "./WebGLDither.js";
 
 export function WorkspaceBackground() {
   return (
     <div className="app-shell__background" aria-hidden="true">
-      <Dither
-        waveColor="#75a97a"
+      <WebGLDither
+        waveColor="#4c8e61"
         backgroundColor="#f5f7f2"
-        palette={["#f5f7f2", "#eaf3e6", "#d8e9d5", "#bfdac2"]}
+        palette={["#f7fbf4", "#e4f2dd", "#b9dfb4", "#8fc896"]}
         colorNum={4}
-        pixelSize={7}
-        waveSpeed={0.012}
-        waveFrequency={2.3}
-        waveAmplitude={0.18}
+        pixelSize={5}
+        waveSpeed={0.055}
+        waveFrequency={3.1}
+        waveAmplitude={0.28}
         ditherMode="bayer4"
         enableMouseInteraction={false}
         clickRipple={false}

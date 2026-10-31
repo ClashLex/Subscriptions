@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import Dither from "../reactbits/Dither.js";
 import { BrandMark } from "./BrandMark.js";
+import { WebGLDither } from "./WebGLDither.js";
 
 export function AuthShell({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
@@ -17,7 +17,8 @@ export function AuthShell({ title, description, children }: { title: string; des
         <p className="auth-shell__foot">A clearer view of every recurring relationship.</p>
       </section>
       <aside className="auth-shell__visual" aria-hidden="true">
-        <Dither waveColor="#BDF66F" backgroundColor="#14251D" palette={["#14251D", "#1D392A", "#82B55B", "#D5FF9A"]} colorNum={4} pixelSize={3} waveSpeed={0.025} waveFrequency={2.8} waveAmplitude={0.24} ditherMode="bayer4" mouseEffect="reveal" mouseRadius={0.25} mouseStrength={0.6} trail={0.35} dpr={1.5} />
+        <span className="auth-shell__texture" />
+        <WebGLDither waveColor="#BDF66F" backgroundColor="#14251D" palette={["#14251D", "#1D392A", "#82B55B", "#D5FF9A"]} colorNum={4} pixelSize={3} waveSpeed={0.025} waveFrequency={2.8} waveAmplitude={0.24} ditherMode="bayer4" mouseEffect="reveal" mouseRadius={0.25} mouseStrength={0.6} trail={0.35} dpr={1.5} />
         <div className="auth-shell__visual-content">
           <span className="visual-kicker"><span /> BRIGHTLOOP / OPERATIONS</span>
           <h2>Every subscription<br />in its right place<span>.</span></h2>

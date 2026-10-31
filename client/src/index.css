@@ -21,8 +21,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 3px solid #71ad75; outline-offset: 3px; }
 
 .app-shell { position: relative; isolation: isolate; min-height: 100vh; background: var(--paper); display: flex; flex-direction: column; }
-.app-shell__background { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: radial-gradient(circle at 90% 4%, #e2f2da 0, transparent 33%), radial-gradient(circle at 6% 90%, #e7f0e6 0, transparent 38%), var(--paper); }
-.app-shell__background > .dither-container { position: absolute; inset: 0; opacity: .42; mix-blend-mode: multiply; }
+.app-shell__background { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: var(--paper); }
+.app-shell__background::before { position: absolute; inset: -8%; content: ""; background: radial-gradient(ellipse at 88% 14%, #a5d5a1 0, transparent 43%), radial-gradient(ellipse at 8% 82%, #bde1bd 0, transparent 45%), #f5f7f2; animation: dither-shift 15s ease-in-out infinite alternate; }
+.app-shell__background::after { position: absolute; inset: 0; content: ""; background-image: radial-gradient(circle, #4b8c5f 1.1px, transparent 1.65px); background-size: 11px 11px; opacity: .24; animation: dither-pixels 24s linear infinite; }
+.app-shell__background > .webgl-dither { position: absolute; inset: 0; z-index: 1; opacity: .72; }
+.webgl-dither > .dither-container { position: absolute; inset: 0; }
+@keyframes dither-shift { from { transform: translate3d(-2%, 1%, 0) scale(1); } to { transform: translate3d(2%, -2%, 0) scale(1.04); } }
+@keyframes dither-pixels { to { background-position: 33px 22px; } }
 .app-header { position: sticky; top: 0; z-index: 30; background: #14261d; color: #f2f8ed; border-bottom: 1px solid #2c4936; box-shadow: 0 14px 42px -30px #0d1a13; }
 .app-header__inner { width: min(100% - 48px, 1512px); min-height: 82px; margin: auto; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: clamp(18px, 3vw, 44px); align-items: center; }
 .app-header__identity { display: flex; align-items: center; gap: 24px; min-width: 0; }
@@ -111,8 +116,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .auth-shell__content .ui-button--primary:hover { background: #295838; }
 .auth-shell__foot { color: #819387; font-size: 11px; }
 .auth-shell__visual { position: relative; min-height: 100vh; overflow: hidden; background: #14251d; color: #f6ffe9; }
-.auth-shell__visual::before { position: absolute; inset: 0; content: ""; background: radial-gradient(ellipse at 72% 26%, #a5d977 0, #5e9e67 24%, transparent 54%), radial-gradient(ellipse at 10% 80%, #40794f 0, transparent 60%), #172b20; }
-.auth-shell__visual > .dither-container { position: absolute; inset: 0; opacity: .78; mix-blend-mode: multiply; }
+.auth-shell__visual::before { position: absolute; inset: -8%; content: ""; background: radial-gradient(ellipse at 72% 26%, #a5d977 0, #5e9e67 24%, transparent 54%), radial-gradient(ellipse at 10% 80%, #40794f 0, transparent 60%), #172b20; animation: dither-shift 15s ease-in-out infinite alternate; }
+.auth-shell__texture { position: absolute; inset: 0; background-image: radial-gradient(circle, #d5f9a9 1.1px, transparent 1.65px); background-size: 11px 11px; opacity: .38; mask-image: radial-gradient(ellipse at 70% 30%, #000 0, transparent 76%); animation: dither-pixels 24s linear infinite; }
+.auth-shell__visual > .webgl-dither { position: absolute; inset: 0; opacity: .78; mix-blend-mode: multiply; }
 .auth-shell__visual::after { position: absolute; inset: 0; content: ""; background: linear-gradient(90deg, #14251d55, transparent 40%), linear-gradient(0deg, #10251ce0, transparent 65%); pointer-events: none; }
 .auth-shell__visual-content { position: absolute; z-index: 2; inset: auto clamp(32px, 6vw, 100px) clamp(48px, 7vw, 100px); }
 .visual-kicker { display: flex; align-items: center; gap: 9px; color: #daffba; font-size: 11px; font-weight: 780; letter-spacing: .16em; }
@@ -180,6 +186,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .dashboard-currency__grid { grid-template-columns: 1fr; }.spotlight-card.dashboard-metric { min-height: 142px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .app-shell__background::before, .app-shell__background::after, .auth-shell__visual::before, .auth-shell__texture { animation: none !important; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
